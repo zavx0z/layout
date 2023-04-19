@@ -48,7 +48,6 @@ export const RightBar = ({children}) => <Box sx={{display: "flex", alignItems: '
 
 export const Body = ({children}) => {
     const contentStyles = {
-        height: '100%',
         flexGrow: 1,
         overflow: "hidden",
         display: 'flex',
@@ -61,6 +60,9 @@ export const Body = ({children}) => {
     </Box>
 }
 export const LeftPanel = ({children}) => children
-export const Content = ({children}) => <Box sx={{display: 'flex', flexGrow: 1}}>{children}</Box>
+export const Content = ({children}) =>
+    <Box sx={{display: 'flex', flexGrow: 1}}>
+        {children}
+    </Box>
 
 
