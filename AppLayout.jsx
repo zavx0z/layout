@@ -1,4 +1,4 @@
-import useViewportHeight from "../../layouts/hooks/useViewportHeight"
+import useViewportHeight from "../../hooks/useViewportHeight"
 import React, {lazy, Suspense, useMemo} from "react"
 import Box from "@mui/material/Box"
 import {LinearProgress} from "@mui/material"
