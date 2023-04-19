@@ -1,7 +1,7 @@
 import Box from "@mui/material/Box"
-import logo from "../../images/logo.png"
+import logo from "../../../images/logo.png"
 import {useNavigate} from "react-router-dom"
-import routes from "../../routes/routes"
+import routes from "../../../routes/routes"
 
 const Logo = (props) => {
     const navigate = useNavigate()
