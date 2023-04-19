@@ -12,7 +12,7 @@ const Icon = ({isAuthenticated}) => isAuthenticated ?
     /> :
     <Login color={"secondary"}/>
 
-const ProfileButton = ({root: {isAuthenticated}, authRoute, profileRoute}) => {
+const ProfileButton = ({root: {isAuthenticated}, authRoute = '/auth/login', profileRoute = '/profile'}) => {
     const navigate = useNavigate()
     const handleClick = () => navigate(isAuthenticated ? profileRoute : authRoute)
     return <IconButton onClick={handleClick}>
