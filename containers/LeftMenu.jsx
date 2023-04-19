@@ -127,7 +127,7 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
                 variant={'caption'}
                 sx={{fontSize: '0.6rem'}}
             >
-                v. {process.env.REACT_APP_VERSION}
+                V{process.env.REACT_APP_VERSION}
             </Typography>
         </Box>
     </Drawer>
