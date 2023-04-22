@@ -2,7 +2,7 @@ import useViewportHeight from "./hooks/useViewportHeight"
 import React, {lazy, Suspense, useMemo} from "react"
 import Box from "@mui/material/Box"
 import {LinearProgress} from "@mui/material"
-import BotLoader from "../../components/BotLoader/BotLoader"
+import BotLoader from "../../elements/BotLoader/BotLoader"
 
 const AppBar = lazy(() => import("./containers/AppBar"))
 
