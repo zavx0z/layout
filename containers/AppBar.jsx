@@ -4,7 +4,7 @@ import React from "react"
 
 const AppBar = ({children}) =>
     <Slide in={true} direction="down">
-        <MuiAppBar position="static" sx={{zIndex: (theme) => theme.zIndex.drawer + 1, overflow: 'hidden'}}>
+        <MuiAppBar position="static" sx={{zIndex: (theme) => theme.zIndex.drawer + 444, overflow: 'hidden'}}>
             <Toolbar sx={theme => ({
                     display: 'flex',
                     alignItems: 'center',

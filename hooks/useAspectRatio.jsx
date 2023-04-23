@@ -8,7 +8,7 @@ const useAspectRatio = (parentRef, w = 16, h = 9) => {
             if (parentRef.current) {
                 const rect = parentRef.current.getBoundingClientRect()
                 const aspectRatio = w / h
-                if (rect.width / rect.height > aspectRatio) {
+                if (rect.height && rect.width / rect.height > aspectRatio) {
                     setWidthHeight([rect.height * aspectRatio, rect.height])
                 } else {
                     setWidthHeight([rect.width, rect.width / aspectRatio])

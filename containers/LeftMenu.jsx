@@ -5,9 +5,9 @@ import ListItemButton from "@mui/material/ListItemButton"
 import ListItemText from "@mui/material/ListItemText"
 import * as React from "react"
 import {useState} from "react"
-import {useLocation, useNavigate} from "react-router-dom"
+import {useLoaderData, useLocation, useNavigate} from "react-router-dom"
 import {useTranslation} from "react-i18next"
-import {Slide} from "@mui/material"
+import {Fade, Slide} from "@mui/material"
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
@@ -18,7 +18,8 @@ import Collapse from "@mui/material/Collapse"
 import {pwaStore} from "../../../index"
 
 
-const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
+const LeftMenu = ({opened, visibleCloseButton, width = 240}) => {
+    const items = useLoaderData()
     const [open, setOpen] = useState(Boolean(opened))
     const drawerWidth = width
     const openedMixin = theme => ({
@@ -42,17 +43,19 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
     const navigate = useNavigate()
     const location = useLocation()
 
-    return <Drawer
-        variant="permanent"
-        sx={theme => ({
-            width: drawerWidth,
-            flexShrink: 0,
-            whiteSpace: 'nowrap',
-            boxSizing: 'border-box',
-            ...(open && {...openedMixin(theme), '& .MuiDrawer-paper': openedMixin(theme)}),
-            ...(!open && {...closedMixin(theme), '& .MuiDrawer-paper': closedMixin(theme)}),
-        })}
-    >
+    return <Fade in={true}>
+        <Drawer
+            id={'leftPanel'}
+            variant="permanent"
+            sx={theme => ({
+                width: drawerWidth,
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+                boxSizing: 'border-box',
+                ...(open && {...openedMixin(theme), '& .MuiDrawer-paper': openedMixin(theme)}),
+                ...(!open && {...closedMixin(theme), '& .MuiDrawer-paper': closedMixin(theme)}),
+            })}
+        >
         <Toolbar/>
         <Box
             sx={{
@@ -130,6 +133,7 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
                 V{process.env.REACT_APP_VERSION}
             </Typography>
         </Box>
-    </Drawer>
+        </Drawer>
+    </Fade>
 }
 export default LeftMenu
