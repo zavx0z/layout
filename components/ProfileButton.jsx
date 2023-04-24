@@ -4,12 +4,7 @@ import {useNavigate} from "react-router-dom"
 import {inject, observer} from "mobx-react"
 
 const Icon = ({isAuthenticated}) => isAuthenticated ?
-    <AccountBox
-        fontSize={'medium'}
-        alt="Profile"
-        color={"secondary"}
-        // src={logo}
-    /> :
+    <AccountBox fontSize={'medium'} alt="Profile" color={"secondary"}/> :
     <Login color={"secondary"}/>
 
 const ProfileButton = ({root: {isAuthenticated}, authRoute = '/auth/login', profileRoute = '/profile'}) => {

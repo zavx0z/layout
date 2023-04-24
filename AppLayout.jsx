@@ -80,7 +80,12 @@ export const Body = ({children}) => {
 }
 export const LeftPanel = ({children}) => children
 export const Content = ({children}) =>
-    <Box sx={{display: 'flex', flexGrow: 1}}>
+    <Box
+        id={'content'}
+        sx={{
+            display: 'flex',
+            flexGrow: 1,
+        }}>
         {children}
     </Box>
 
