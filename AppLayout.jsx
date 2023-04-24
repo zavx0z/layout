@@ -1,7 +1,7 @@
 import useViewportHeight from "./hooks/useViewportHeight"
 import React, {lazy, Suspense, useMemo} from "react"
 import Box from "@mui/material/Box"
-import {LinearProgress} from "@mui/material"
+import {Fade, LinearProgress} from "@mui/material"
 import BotLoader from "../../elements/BotLoader/BotLoader"
 
 const AppBar = lazy(() => import("./containers/AppBar"))
@@ -80,13 +80,15 @@ export const Body = ({children}) => {
 }
 export const LeftPanel = ({children}) => children
 export const Content = ({children}) =>
-    <Box
-        id={'content'}
-        sx={{
-            display: 'flex',
-            flexGrow: 1,
-        }}>
-        {children}
-    </Box>
+    <Fade in={!!children}>
+        <Box
+            id={'content'}
+            sx={{
+                display: 'flex',
+                flexGrow: 1,
+            }}>
+            {children}
+        </Box>
+    </Fade>
 
 

@@ -5,7 +5,7 @@ import ListItemButton from "@mui/material/ListItemButton"
 import ListItemText from "@mui/material/ListItemText"
 import * as React from "react"
 import {useState} from "react"
-import {useLoaderData, useLocation, useNavigate} from "react-router-dom"
+import {matchPath, useLocation, useNavigate} from "react-router-dom"
 import {useTranslation} from "react-i18next"
 import {Fade, Slide} from "@mui/material"
 import Box from '@mui/material/Box'
@@ -40,7 +40,7 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
     const handleDrawerToggle = () => setOpen(!open)
     const {t} = useTranslation('меню')
     const navigate = useNavigate()
-    const location = useLocation()
+    const {pathname} = useLocation()
 
     return <Fade in={true}>
         <Drawer
@@ -65,16 +65,18 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
             {items.map((item, idx) =>
                 <Box key={idx}>
                     <List sx={{pb: 0, pt: 0}}>
-                        {item.map(({title, subtitle, route, Icon}, index) => (
-                            <ListItem key={index} disablePadding>
+                        {item.map(({title, subtitle, route, Icon}, index) => {
+                            const selected = !!matchPath(route, pathname)
+                            const handleClick = () => !selected && navigate(route)
+                            return <ListItem key={index} disablePadding>
                                 <ListItemButton
                                     sx={theme => ({
-                                        minHeight: theme.spacing(7),
                                         p: 0,
-                                        justifyItems: 'flex-start'
+                                        justifyItems: 'flex-start',
+                                        minHeight: theme.spacing(7)
                                     })}
-                                    selected={location.pathname.includes(route)}
-                                    onClick={() => navigate(route)}
+                                    selected={selected}
+                                    onClick={handleClick}
                                 >
                                     <Box sx={theme => ({
                                         minWidth: theme.spacing(8),
@@ -89,12 +91,7 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
                                             </Typography>
                                         </Collapse>
                                     </Box>
-                                    <Slide
-                                        in={open}
-                                        // mountOnEnter
-                                        // unmountOnExit
-                                        direction={'left'}
-                                    >
+                                    <Slide in={open} direction={'left'}>
                                         <Box>
                                             <ListItemText
                                                 primary={t(title)}
@@ -106,7 +103,7 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
                                     </Slide>
                                 </ListItemButton>
                             </ListItem>
-                        ))}
+                        })}
                     </List>
                     {items.length > 1 && <Divider sx={theme => ({backgroundColor: theme.palette.primary.light})}/>}
                 </Box>
