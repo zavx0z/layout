@@ -11,8 +11,6 @@ const AppBar = ({children}) =>
                     alignContent: 'center',
                     '&.MuiToolbar-root': {
                         p: 0
-                        // pl: theme.spacing(2),
-                        // pr: theme.spacing(2)
                     }
                 }
             )}>

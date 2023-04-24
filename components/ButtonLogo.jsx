@@ -1,6 +1,6 @@
 import {matchPath, useLocation, useNavigate} from "react-router-dom"
 import {IconButton} from "@mui/material"
-import BotsWorkIcon from "../../../icons/BotsWorkIcon"
+import BotsWorkIcon from "../../../media/icons/BotsWorkIcon"
 import React from "react"
 
 export const ButtonLogo = ({to = '/', ...buttonProps}) => {
