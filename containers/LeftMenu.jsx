@@ -7,7 +7,7 @@ import * as React from "react"
 import {useState} from "react"
 import {matchPath, useLocation, useNavigate} from "react-router-dom"
 import {useTranslation} from "react-i18next"
-import {Fade, Slide} from "@mui/material"
+import {Fade} from "@mui/material"
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
@@ -91,16 +91,13 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
                                             </Typography>
                                         </Collapse>
                                     </Box>
-                                    <Slide in={open} direction={'left'}>
-                                        <Box>
-                                            <ListItemText
-                                                primary={t(title)}
-                                                primaryTypographyProps={{color: 'primary'}}
-                                                secondary={t(subtitle)}
-                                                secondaryTypographyProps={{variant: 'caption', sx: {mt: -.2}}}
-                                            />
-                                        </Box>
-                                    </Slide>
+                                    {open && <ListItemText
+                                        primary={t(title)}
+                                        primaryTypographyProps={{color: 'primary'}}
+                                        secondary={t(subtitle)}
+                                        secondaryTypographyProps={{variant: 'caption', sx: {mt: -.2}}}
+                                    />
+                                    }
                                 </ListItemButton>
                             </ListItem>
                         })}

@@ -1,6 +1,6 @@
 import {themeColor} from "../palette"
 
-console.log(themeColor.typography)
+// console.log(themeColor.typography)
 
 export default {
     typography: {
