@@ -1,7 +1,7 @@
 import {matchPath, useLocation, useNavigate} from "react-router-dom"
 import Button from "@mui/material/Button"
 import Box from "@mui/material/Box"
-import wordmark from "../../../media/images/wordmark.png"
+import wordmark from "../../../resource/images/wordmark.png"
 import React from "react"
 
 const ButtonWordMark = ({to = '/', ...buttonProps}) => {

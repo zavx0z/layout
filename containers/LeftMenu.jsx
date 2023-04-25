@@ -86,7 +86,7 @@ const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
                                     })}>
                                         <Icon sx={{color: 'primary.light'}}/>
                                         <Collapse in={!open} mountOnEnter unmountOnExit orientation={'vertical'} duration={100}>
-                                            <Typography noWrap sx={{fontSize: '0.6rem'}}>
+                                            <Typography noWrap sx={{fontSize: '0.6rem!important'}}>
                                                 {t(title)}
                                             </Typography>
                                         </Collapse>
