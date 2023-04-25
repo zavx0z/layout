@@ -9,8 +9,8 @@ export default {
             [themeColor.breakpoints.up('md')]: {
                 fontSize: '2rem',
             },
-            [themeColor.breakpoints.down('sm')]: {
-                fontSize: '1.5rem',
+            [themeColor.breakpoints.down('md')]: {
+                fontSize: '1rem',
             },
             [themeColor.breakpoints.down('xs')]: {
                 fontSize: '0.5rem',
