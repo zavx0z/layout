@@ -7,7 +7,7 @@ import React from "react"
 const ButtonWordMark = ({to = '/', ...buttonProps}) => {
     const navigate = useNavigate()
     const {pathname} = useLocation()
-    const handleClick = () => !matchPath(to, pathname) && navigate(to)
+    const handleClick = () => Boolean(to) ? !matchPath(to, pathname) && navigate(to) : navigate('/')
     return <Button
         sx={{p: 0}}
         onClick={handleClick}

@@ -6,7 +6,7 @@ import React from "react"
 const ButtonProfile = ({to = '/profile'}) => {
     const navigate = useNavigate()
     const {pathname} = useLocation()
-    const handleClick = () => !matchPath(to, pathname) && navigate(to)
+    const handleClick = () => Boolean(to) ? !matchPath(to, pathname) && navigate(to) : navigate('/')
     return <IconButton onClick={handleClick}>
         <AccountBox alt="Profile" color={"secondary"}/> :
     </IconButton>
