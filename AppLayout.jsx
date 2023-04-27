@@ -42,30 +42,6 @@ export const TopBar = ({children}) =>
             {children}
         </AppBar>
     </Suspense>
-export const LeftBar = ({children, width = 240}) =>
-    <Box
-        sx={theme => ({
-            display: "flex",
-            width: `calc(${theme.spacing(5)} + 1px)`,
-            alignItems: 'center',
-            alignContent: 'center',
-            justifyContent: 'flex-start'
-        })}
-    >
-        {children}
-    </Box>
-export const CenterBar = ({children}) => <Box sx={{display: "flex", alignItems: 'center', flexGrow: 1}}>{children}</Box>
-export const RightBar = ({children}) =>
-    <Box
-        sx={theme=>({
-            display: "flex",
-            width: `calc(${theme.spacing(8)} + 1px)`,
-            alignItems: 'center',
-            justifyContent: 'center'
-        })}>
-        {children}
-    </Box>
-
 
 export const Body = ({children}) => {
     const contentStyles = {
