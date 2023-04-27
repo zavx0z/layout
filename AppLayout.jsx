@@ -9,6 +9,7 @@ const AppBar = lazy(() => import("./containers/AppBar"))
 export const Root = ({children}) => {
     const suspenseStyles = {
         position: "absolute",
+        width: "100%",
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
@@ -45,9 +46,10 @@ export const LeftBar = ({children, width = 240}) =>
     <Box
         sx={theme => ({
             display: "flex",
-            width: `calc(${theme.spacing(8)} + 1px)`,
+            width: `calc(${theme.spacing(5)} + 1px)`,
             alignItems: 'center',
-            justifyContent: 'center'
+            alignContent: 'center',
+            justifyContent: 'flex-start'
         })}
     >
         {children}
