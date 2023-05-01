@@ -17,7 +17,7 @@ import Collapse from "@mui/material/Collapse"
 import {pwaStore} from "../../../index"
 
 
-const LeftMenu = ({opened, items, visibleCloseButton, width = 240}) => {
+const LeftMenu = ({opened, items, visibleCloseButton, width = 215}) => {
     const [open, setOpen] = useState(Boolean(opened))
     const drawerWidth = width
     const openedMixin = theme => ({

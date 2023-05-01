@@ -2,7 +2,7 @@ import {themeColor} from "../palette"
 
 // console.log(themeColor.typography)
 
-export default {
+const typography = {
     typography: {
         h1: {
             color: themeColor.palette.primary.dark,
@@ -147,3 +147,4 @@ export default {
 //         "textTransform": "uppercase"
 //     }
 // }
+export default typography
