@@ -6,13 +6,12 @@ const AppBar = ({children}) =>
     <Slide in={true} direction="down">
         <MuiAppBar
             position="static"
-            color={'secondary'}
+            // color={'secondary'}
             sx={{
                 zIndex: (theme) => theme.zIndex.drawer + 444,
                 overflow: 'hidden'
         }}>
             <Toolbar
-
                 sx={theme => ({
                     display: 'flex',
                     alignItems: 'center',
