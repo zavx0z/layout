@@ -59,3 +59,8 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
   monospace;
 }
+
+.stats {
+  top: auto !important;
+  bottom: 0px;
+}
