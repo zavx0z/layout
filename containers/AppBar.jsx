@@ -17,7 +17,8 @@ const AppBar = ({children}) =>
                     alignItems: 'center',
                     alignContent: 'center',
                     '&.MuiToolbar-root': {
-                        p: 0
+                        p: 0,
+                        minHeight: 'auto',
                     }
                 }
             )}>

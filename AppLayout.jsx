@@ -17,7 +17,6 @@ export const Root = ({children}) => {
         alignItems: "center",
         justifyContent: "center",
         bgcolor: "rgba(255, 255, 255, 0.8)",
-        borderRadius: "8px",
         p: 2,
     }
     const {viewportHeight} = useViewportHeight()
