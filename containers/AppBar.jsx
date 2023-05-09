@@ -8,7 +8,7 @@ const AppBar = ({children}) =>
             position="static"
             // color={'secondary'}
             sx={{
-                zIndex: (theme) => theme.zIndex.drawer + 444,
+                zIndex: (theme) => theme.zIndex.drawer + 1,
                 overflow: 'hidden'
         }}>
             <Toolbar
