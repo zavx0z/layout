@@ -20,7 +20,7 @@ body {
   position: fixed;
   overscroll-behavior: contain;
   overscroll-behavior-y: contain;
-  height: 200px;
+  height: 100vh;
 }
 
 
@@ -45,6 +45,10 @@ img {
 /** {*/
 /*  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);*/
 /*}*/
+#metafor {
+  z-index: 1400;
+  position: relative;
+}
 
 #root {
   overflow: hidden;
@@ -62,5 +66,5 @@ code {
 
 .stats {
   top: auto !important;
-  bottom: 0px;
+  bottom: 0;
 }
