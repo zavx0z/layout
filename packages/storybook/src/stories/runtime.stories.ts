@@ -11,7 +11,7 @@ export class RuntimeStory extends UiSurface {
       z: Z.CONTAINER,
     })
     this.drawText("UI runtime", 22, 30, {fontPx: 17, material: this.materials.text, z: Z.TEXT})
-    this.drawText("one renderer · retained surfaces · HUD · spatial displays", 22, 58, {
+    this.drawText("one renderer · retained surfaces · HUD · optional spatial displays", 22, 58, {
       fontPx: 11,
       material: this.materials.muted,
       maxWidthPx: Math.max(1, this.rectW - 44),

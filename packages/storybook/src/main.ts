@@ -9,7 +9,7 @@ const runtime = await UiRuntime.create(canvas, {
   virtualDisplay: {initial: "near", surfaceDisplay: true, grid: true},
 })
 const story = new RuntimeStory({bgColor: null, borderColor: null})
-runtime.addSurface(story, ({w, h}) => ({
+runtime.addHudSurface(story, ({w, h}) => ({
   x: Math.max(18, (w - Math.min(560, w - 36)) / 2),
   y: Math.max(80, (h - Math.min(260, h - 150)) / 2),
   w: Math.min(560, w - 36),
