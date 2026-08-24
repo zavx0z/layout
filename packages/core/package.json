@@ -1,0 +1,33 @@
+{
+  "name": "@layout/core",
+  "version": "0.1.0",
+  "description": "A retained UI runtime for HUDs, virtual displays, surfaces, input and spatial WebGPU interfaces. Built for MetaFor.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zavx0z/layout.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://zavx0z.github.io/layout/",
+  "metafor": "https://github.com/zavx0z/metafor",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./runtime": "./src/runtime.ts",
+    "./surface": "./src/surface.ts",
+    "./display": "./src/targets/display.ts",
+    "./hud": "./src/targets/hud.ts",
+    "./texture": "./src/targets/texture.ts",
+    "./text-input": "./src/text-input.ts",
+    "./flex": "./src/flex.ts",
+    "./flex-css": "./src/flex-css.ts",
+    "./polyline": "./src/polyline.ts",
+    "./popover": "./src/popover-owner.ts",
+    "./virtual-input": "./src/virtual-input.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@engine/core": "link:@engine/core"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@layout/storybook",
+  "version": "0.1.0",
+  "description": "Static stories for the Layout UI engine. Built for MetaFor.",
+  "homepage": "https://zavx0z.github.io/layout/",
+  "metafor": "https://github.com/zavx0z/metafor",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zavx0z/layout.git",
+    "directory": "packages/storybook"
+  },
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun server.ts",
+    "pages": "bun scripts/build-pages.ts",
+    "typecheck": "tsc --project tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@engine/core": "link:@engine/core",
+    "@layout/core": "workspace:*"
+  }
+}

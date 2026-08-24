@@ -1,0 +1,29 @@
+{
+  "name": "@layout/workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Built for MetaFor: retained UI-engine infrastructure for HUDs and immersive WebGPU interfaces.",
+  "homepage": "https://zavx0z.github.io/layout/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zavx0z/layout.git"
+  },
+  "metafor": "https://github.com/zavx0z/metafor",
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "bun run --workspaces typecheck",
+    "test": "bun test packages",
+    "check": "bun run typecheck && bun run test",
+    "storybook": "bun run --cwd packages/storybook dev",
+    "pages": "bun run --cwd packages/storybook pages"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "@webgpu/types": "^0.1.68",
+    "typescript": "^7.0.2"
+  }
+}
