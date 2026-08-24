@@ -15,6 +15,8 @@ runtime.addHudSurface(story, ({w, h}) => ({
   w: Math.min(560, w - 36),
   h: Math.min(260, h - 150),
 }))
+runtime.handleResize()
+window.addEventListener("resize", () => runtime.handleResize())
 
 const hud = document.querySelector("#hud")
 const space = document.querySelector("#space")
