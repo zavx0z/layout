@@ -46,3 +46,7 @@ bun run storybook
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for ownership and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution workflow.
+
+## License
+
+[MIT](./LICENSE)

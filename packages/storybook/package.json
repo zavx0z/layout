@@ -4,6 +4,7 @@
   "description": "Static stories for the Layout UI engine. Built for MetaFor.",
   "homepage": "https://zavx0z.github.io/layout/",
   "metafor": "https://github.com/zavx0z/metafor",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/zavx0z/layout.git",

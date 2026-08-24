@@ -9,6 +9,7 @@
   },
   "homepage": "https://zavx0z.github.io/layout/",
   "metafor": "https://github.com/zavx0z/metafor",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "exports": {
