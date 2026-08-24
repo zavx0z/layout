@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: zavx0z/engine
-          ref: 9571c00081ee435354c5c6313d41f15aabec8cd3
+          ref: e330dceba73b64cff23becbb94bef1ee043f8446
           path: .deps/engine
       - uses: oven-sh/setup-bun@v2
         with:
