@@ -2,6 +2,7 @@ import {beforeAll, describe, expect, test} from "bun:test"
 import {
   BufferGeometry,
   Color,
+  Matrix4,
   Mesh,
   Object3D,
   type TrueTypeFont,
@@ -332,5 +333,127 @@ describe("UiSurface scoped child clips", () => {
     surface.dispose()
     expect(surface.mainLayer().children).toHaveLength(0)
     expect(surface.pointerHitKey(50, 40)).toBeNull()
+  })
+
+  test("refreshes retained root pixels and input after resize without replacing subtree identity", () => {
+    const fake = createFakeRuntime()
+    const surface = new ChildClipTestSurface({
+      bgColor: new Color(0x222222),
+      borderColor: new Color(0x444444),
+      borderRadiusPx: 20,
+    })
+    surface.attachCanvas(fake.runtime)
+    surface.setRect({x: 0, y: 0, w: 100, h: 80}, 0.001, font)
+    const parent = surface.createParent()
+    let wheels = 0
+    let dismissals = 0
+    surface.materialize(parent, () => {
+      surface.drawRect(0, 0, 200, 160, new Color(0xffffff))
+      surface.hit(0, 0, 200, 160, () => {}, {key: "resized-root"})
+      surface.wheel(0, 0, 200, 160, () => { wheels += 1 }, "resized-root-wheel")
+      surface.dismissableLayer({
+        key: "resized-root-dismiss",
+        regions: [{x: 0, y: 0, w: 200, h: 160}],
+        dismiss: () => { dismissals += 1 },
+      })
+      surface.withOverlayPortal(() => {
+        surface.drawRect(0, 0, 200, 160, new Color(0x88ccff))
+      })
+    })
+
+    const visual = parent.children[0] as Mesh
+    const geometry = visual.geometry
+    const clips = visual.presentationClips
+    const portal = surface.retainedOverlayLayer().children[0]!
+    const portalVisual = portal.children[0] as Mesh
+    const portalGeometry = portalVisual.geometry
+    const portalClips = portalVisual.presentationClips
+    expect(clips[0]?.halfSize).toEqual([0.05, 0.04])
+    expect(portalClips[0]).toBe(clips[0])
+    expect(surface.pointerHitKey(150, 80)).toBeNull()
+    expect(surface.wheelAt(150, 80)).toBeFalse()
+    surface.onPointerDown({button: 0} as MouseEvent, 150, 80)
+    expect(dismissals).toBe(1)
+
+    surface.setRect({x: 0, y: 0, w: 200, h: 160}, 0.001, font)
+    expect(parent.children[0]).toBe(visual)
+    expect(visual.geometry).toBe(geometry)
+    expect(portal.children[0]).toBe(portalVisual)
+    expect(portalVisual.geometry).toBe(portalGeometry)
+    expect(visual.presentationClips).not.toBe(clips)
+    expect(portalVisual.presentationClips).not.toBe(portalClips)
+    expect(visual.presentationClips[0]?.halfSize).toEqual([0.1, 0.08])
+    expect(portalVisual.presentationClips[0]).toBe(visual.presentationClips[0])
+    expect(surface.pointerHitKey(150, 80)).toBe("resized-root")
+    expect(surface.wheelAt(150, 80)).toBeTrue()
+    expect(wheels).toBe(1)
+    surface.onPointerDown({button: 0} as MouseEvent, 150, 80)
+    expect(dismissals).toBe(1)
+
+    const resizedClips = visual.presentationClips
+    surface.moveRect({x: 20, y: 30, w: 200, h: 160}, 0.001, font)
+    expect(visual.presentationClips).toBe(resizedClips)
+    expect(() => surface.moveRect({x: 20, y: 30, w: 200, h: 160}, 0.002, font))
+      .toThrow("moveRect requires an unchanged pixelScale")
+    surface.dispose()
+  })
+
+  test("broad-phases retained candidates and caches clip matrices once per input resolution", () => {
+    const {surface} = setupSurface({borderRadiusPx: 20}, () => {}, {w: 240, h: 180})
+    const parent = surface.createParent()
+    surface.materialize(parent, () => {
+      surface.withChildClip({kind: "rounded-rect", x: 0, y: 0, w: 40, h: 40, radius: 10}, () => {
+        surface.drawRect(0, 0, 40, 40, new Color(0xffffff))
+        surface.hit(0, 0, 40, 40, () => {}, {key: "winner"})
+        surface.wheel(0, 0, 40, 40, () => {}, "winner-wheel")
+        surface.dismissableLayer({
+          key: "winner-dismiss",
+          regions: [{x: 0, y: 0, w: 40, h: 40}],
+          dismiss: () => {},
+        })
+        for (let index = 0; index < 128; index += 1) {
+          const x = 1_000 + index * 50
+          surface.hit(x, 1_000, 20, 20, () => {}, {key: `far:${index}`})
+          surface.wheel(x, 1_000, 20, 20, () => {}, `far-wheel:${index}`)
+        }
+      })
+    })
+
+    const originalUpdateWorldMatrix = surface.node.updateWorldMatrix.bind(surface.node)
+    const originalInvert = Matrix4.prototype.invert
+    let worldUpdates = 0
+    let inversions = 0
+    surface.node.updateWorldMatrix = (force = false): void => {
+      worldUpdates += 1
+      originalUpdateWorldMatrix(force)
+    }
+    Matrix4.prototype.invert = function (): Matrix4 {
+      inversions += 1
+      return originalInvert.call(this)
+    }
+    try {
+      surface.onPointerDown({button: 0} as MouseEvent, 20, 20)
+      expect(worldUpdates).toBe(1)
+      expect(inversions).toBe(2)
+
+      worldUpdates = 0
+      inversions = 0
+      expect(surface.wheelAt(20, 20)).toBeTrue()
+      expect(worldUpdates).toBe(1)
+      expect(inversions).toBe(2)
+
+      parent.scale.x = 0
+      parent.updateMatrix()
+      worldUpdates = 0
+      inversions = 0
+      expect(surface.pointerHitKey(0, 20)).toBeNull()
+      expect(worldUpdates).toBe(1)
+      expect(inversions).toBe(1)
+    } finally {
+      Matrix4.prototype.invert = originalInvert
+      surface.node.updateWorldMatrix = originalUpdateWorldMatrix
+      surface.onDeactivate()
+      surface.dispose()
+    }
   })
 })

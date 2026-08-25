@@ -410,6 +410,16 @@ type ResolvedWheelHitBox = WheelHitBox & Readonly<{
   presentationClips: readonly PresentationClipShape[]
 }>
 
+type PresentationClipInputContext = {
+  point: Readonly<{x: number; y: number}>
+  matricesReady: boolean
+  worldPoint: Vector3 | null
+  surfaceInverse: Matrix4 | null
+  inverseByCoordinateSpace: Map<Object3D, Matrix4 | null>
+  localPointByCoordinateSpace: Map<Object3D, Vector3 | null>
+  projectionScratch: Vector3
+}
+
 const RETAINED_UNBOUNDED_CLIP: ClipLocalRect = {
   xMin: Number.NEGATIVE_INFINITY,
   yMin: Number.NEGATIVE_INFINITY,
@@ -532,6 +542,7 @@ export abstract class UiSurface implements UiSurfaceNode {
   readonly #retainedOverlayPortals = new Map<Object3D, RetainedOverlayPortal>()
   #retainedMaterialization: RetainedMaterialization | null = null
   readonly #presentationClipStack: PresentationClipShape[] = []
+  #rootPresentationClipShape: PresentationClipShape | null = null
   #suppressPresentationClipsDepth = 0
   #drawLayer: UiSurfaceDrawLayer = "main"
   #framebufferDisplayId: UiDisplayId = "default"
@@ -774,13 +785,17 @@ export abstract class UiSurface implements UiSurfaceNode {
       layer.position.y = -this.#padTop * pixelScale
       layer.updateMatrix()
     }
+    this.#refreshRetainedRootPresentationClip()
     this.#syncChrome(rect.w, rect.h)
     this.#rerenderNow()
   }
 
+  /** Position-only update; a scale change must take the full `setRect` path. */
   moveRect(rect: UiSurfaceRect, pixelScale: number, font: TrueTypeFont): void {
+    if (pixelScale !== this.pixelScale) {
+      throw new Error("UiSurface.moveRect requires an unchanged pixelScale; use setRect for scale changes")
+    }
     this.font = font
-    this.pixelScale = pixelScale
     this.#screenOriginX = rect.x
     this.#screenOriginY = rect.y
     this.#refreshClipBounds()
@@ -1913,8 +1928,9 @@ export abstract class UiSurface implements UiSurfaceNode {
   onPointerDown(_event: MouseEvent, localX: number, localY: number): void {
     const innerX = localX - this.#padLeft
     const innerY = localY - this.#padTop
-    this.#dismissOutside(innerX, innerY)
-    const hit = this.#hitAt(innerX, innerY)
+    const context = this.#createPresentationClipInputContext(innerX, innerY)
+    this.#dismissOutside(innerX, innerY, context)
+    const hit = this.#hitAt(innerX, innerY, context)
     if (hit === null) return
     this.pressedHit = hit
     this.#pressedHitKey = hit.key
@@ -2092,7 +2108,7 @@ export abstract class UiSurface implements UiSurfaceNode {
 
   #presentationClipSnapshot(): readonly PresentationClipShape[] {
     if (this.#suppressPresentationClipsDepth > 0) return Object.freeze([])
-    const root = this.#rootPresentationClip()
+    const root = this.#rootPresentationClipShape
     if (root === null && this.#presentationClipStack.length === 0) return Object.freeze([])
     return Object.freeze([
       ...(root === null ? [] : [root]),
@@ -2100,7 +2116,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     ])
   }
 
-  #rootPresentationClip(): PresentationClipShape | null {
+  #createRootPresentationClip(): PresentationClipShape | null {
     if (!(this.#borderRadiusPx > 0)) return null
     return createPresentationClipShape(
       this.#retainedLayer,
@@ -2114,6 +2130,42 @@ export abstract class UiSurface implements UiSurfaceNode {
       },
       this.pixelScale,
     )
+  }
+
+  #refreshRetainedRootPresentationClip(): void {
+    const previous = this.#rootPresentationClipShape
+    const next = this.#createRootPresentationClip()
+    this.#rootPresentationClipShape = next
+    if (previous === null) return
+
+    const replace = (clips: readonly PresentationClipShape[]): readonly PresentationClipShape[] => {
+      if (clips[0] !== previous) return clips
+      return Object.freeze(next === null ? clips.slice(1) : [next, ...clips.slice(1)])
+    }
+    const refreshVisuals = (root: Object3D): void => {
+      const refreshed = replace(root.presentationClips)
+      if (refreshed !== root.presentationClips) root.presentationClips = refreshed
+      for (const child of root.children) refreshVisuals(child)
+    }
+    refreshVisuals(this.#retainedLayer)
+    refreshVisuals(this.#retainedOverlayLayer)
+
+    for (const [parent, records] of [...this.#retainedHits]) {
+      const refreshed = records.map((record) => ({...record, presentationClips: replace(record.presentationClips)}))
+      this.#replaceRetainedHits(parent, refreshed)
+    }
+    for (const [parent, records] of [...this.#retainedWheelHits]) {
+      this.#replaceRetainedWheelHits(parent, records.map((record) => ({
+        ...record,
+        presentationClips: replace(record.presentationClips),
+      })))
+    }
+    for (const [parent, records] of [...this.#retainedDismissables]) {
+      this.#replaceRetainedDismissables(parent, records.map((record) => ({
+        ...record,
+        presentationClips: replace(record.presentationClips),
+      })))
+    }
   }
 
   #resolvePresentationClip(shape: UiClipShape): PresentationClipShape {
@@ -2396,34 +2448,153 @@ export abstract class UiSurface implements UiSurfaceNode {
     return this.canvas.uiRectToFramebufferClipBounds(xMin, yMin, xMax, yMax, this.#framebufferDisplayId)
   }
 
-  #pointInsidePresentationClips(
-    point: Readonly<{x: number; y: number}>,
-    clips: readonly PresentationClipShape[],
-  ): boolean {
-    if (clips.length === 0) return true
+  #createPresentationClipInputContext(x: number, y: number): PresentationClipInputContext {
+    return {
+      point: {x, y},
+      matricesReady: false,
+      worldPoint: null,
+      surfaceInverse: null,
+      inverseByCoordinateSpace: new Map(),
+      localPointByCoordinateSpace: new Map(),
+      projectionScratch: new Vector3(),
+    }
+  }
+
+  #ensurePresentationClipInputMatrices(context: PresentationClipInputContext): boolean {
+    if (context.matricesReady) return context.worldPoint !== null && context.surfaceInverse !== null
+    context.matricesReady = true
+    if (!Number.isFinite(this.pixelScale) || this.pixelScale === 0) return false
     this.#updateRetainedMatrices()
     const surfaceMatrix = this.#retainedLayer.matrixWorld
     if (!matrixCanTransformPresentationClip(surfaceMatrix)) return false
-    const worldPoint = new Vector3(point.x * this.pixelScale, -point.y * this.pixelScale, 0)
-      .applyMatrix4(surfaceMatrix)
+    const surfaceInverse = new Matrix4().copy(surfaceMatrix).invert()
+    if (!surfaceInverse.elements.every(Number.isFinite)) return false
+    const localPoint = new Vector3(context.point.x * this.pixelScale, -context.point.y * this.pixelScale, 0)
+    const worldPoint = new Vector3(localPoint.x, localPoint.y, localPoint.z).applyMatrix4(surfaceMatrix)
     if (![worldPoint.x, worldPoint.y, worldPoint.z].every(Number.isFinite)) return false
-    return clips.every((clip) => pointInsidePresentationClip(worldPoint, clip))
+    context.worldPoint = worldPoint
+    context.surfaceInverse = surfaceInverse
+    context.inverseByCoordinateSpace.set(this.#retainedLayer, surfaceInverse)
+    context.localPointByCoordinateSpace.set(this.#retainedLayer, localPoint)
+    return true
   }
 
-  #hitAt(x: number, y: number): HitBox | null {
-    const retained = this.#retainedHitAt(x, y)
+  #presentationClipInverse(
+    coordinateSpace: Object3D,
+    context: PresentationClipInputContext,
+  ): Matrix4 | null {
+    if (!this.#ensurePresentationClipInputMatrices(context)) return null
+    if (context.inverseByCoordinateSpace.has(coordinateSpace)) {
+      return context.inverseByCoordinateSpace.get(coordinateSpace) ?? null
+    }
+    const matrix = coordinateSpace.matrixWorld
+    if (!matrixCanTransformPresentationClip(matrix)) {
+      context.inverseByCoordinateSpace.set(coordinateSpace, null)
+      return null
+    }
+    const inverse = new Matrix4().copy(matrix).invert()
+    if (!inverse.elements.every(Number.isFinite)) {
+      context.inverseByCoordinateSpace.set(coordinateSpace, null)
+      return null
+    }
+    context.inverseByCoordinateSpace.set(coordinateSpace, inverse)
+    return inverse
+  }
+
+  #presentationClipLocalPoint(
+    coordinateSpace: Object3D,
+    context: PresentationClipInputContext,
+  ): Vector3 | null {
+    if (context.localPointByCoordinateSpace.has(coordinateSpace)) {
+      return context.localPointByCoordinateSpace.get(coordinateSpace) ?? null
+    }
+    const inverse = this.#presentationClipInverse(coordinateSpace, context)
+    const worldPoint = context.worldPoint
+    if (inverse === null || worldPoint === null) {
+      context.localPointByCoordinateSpace.set(coordinateSpace, null)
+      return null
+    }
+    const localPoint = new Vector3(worldPoint.x, worldPoint.y, worldPoint.z).applyMatrix4(inverse)
+    if (![localPoint.x, localPoint.y, localPoint.z].every(Number.isFinite)) {
+      context.localPointByCoordinateSpace.set(coordinateSpace, null)
+      return null
+    }
+    context.localPointByCoordinateSpace.set(coordinateSpace, localPoint)
+    return localPoint
+  }
+
+  #retainedLocalPoint(
+    parent: Object3D,
+    context: PresentationClipInputContext,
+  ): Readonly<{x: number; y: number}> | null {
+    const point = this.#presentationClipLocalPoint(parent, context)
+    if (point === null) return null
+    return {x: point.x / this.pixelScale, y: -point.y / this.pixelScale}
+  }
+
+  #retainedRectBroadPhase(
+    parent: Object3D,
+    rect: UiSurfaceRect,
+    context: PresentationClipInputContext,
+  ): UiSurfaceRect | null {
+    if (!this.#ensurePresentationClipInputMatrices(context) || context.surfaceInverse === null) return null
+    if (!parent.matrixWorld.elements.every(Number.isFinite)) return null
+    const point = context.projectionScratch
+    let xMin = Number.POSITIVE_INFINITY
+    let yMin = Number.POSITIVE_INFINITY
+    let xMax = Number.NEGATIVE_INFINITY
+    let yMax = Number.NEGATIVE_INFINITY
+    for (let index = 0; index < 4; index += 1) {
+      const x = index === 1 || index === 2 ? rect.x + rect.w : rect.x
+      const y = index >= 2 ? rect.y + rect.h : rect.y
+      point.set(x * this.pixelScale, -y * this.pixelScale, 0)
+        .applyMatrix4(parent.matrixWorld)
+        .applyMatrix4(context.surfaceInverse)
+      if (![point.x, point.y, point.z].every(Number.isFinite)) return null
+      const surfaceX = point.x / this.pixelScale
+      const surfaceY = -point.y / this.pixelScale
+      xMin = Math.min(xMin, surfaceX)
+      yMin = Math.min(yMin, surfaceY)
+      xMax = Math.max(xMax, surfaceX)
+      yMax = Math.max(yMax, surfaceY)
+    }
+    return {x: xMin, y: yMin, w: xMax - xMin, h: yMax - yMin}
+  }
+
+  #pointInsidePresentationClips(
+    clips: readonly PresentationClipShape[],
+    context: PresentationClipInputContext,
+  ): boolean {
+    if (clips.length === 0) return true
+    if (!this.#ensurePresentationClipInputMatrices(context)) return false
+    return clips.every((clip) => {
+      const localPoint = this.#presentationClipLocalPoint(clip.coordinateSpace, context)
+      return localPoint !== null && pointInsidePresentationClip(localPoint, clip)
+    })
+  }
+
+  #hitAt(
+    x: number,
+    y: number,
+    context = this.#createPresentationClipInputContext(x, y),
+  ): HitBox | null {
+    const retained = this.#retainedHitAt(x, y, context)
     if (retained !== null) return retained
     for (let i = this.#hits.length - 1; i >= 0; i--) {
       const h = this.#hits[i]!
       if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h &&
-        this.#pointInsidePresentationClips({x, y}, h.presentationClips)) return h
+        this.#pointInsidePresentationClips(h.presentationClips, context)) return h
     }
     return null
   }
 
-  #dismissOutside(x: number, y: number): void {
+  #dismissOutside(
+    x: number,
+    y: number,
+    context = this.#createPresentationClipInputContext(x, y),
+  ): void {
     const record = this.#topDismissableLayer()
-    if (record === null || this.#pointInsideDismissable(record, x, y)) return
+    if (record === null || this.#pointInsideDismissable(record, x, y, context)) return
     this.#dismissLayer(record, "outside")
   }
 
@@ -2433,10 +2604,23 @@ export abstract class UiSurface implements UiSurfaceNode {
     return this.#dismissables[this.#dismissables.length - 1] ?? null
   }
 
-  #pointInsideDismissable(record: DismissableLayerRecord, x: number, y: number): boolean {
-    if (!this.#pointInsidePresentationClips({x, y}, record.presentationClips)) return false
-    const point = record.parent === null ? {x, y} : this.surfaceToRetainedPoint(record.parent, {x, y})
-    return record.regions.some((region) => pointInsideRect(point, region))
+  #pointInsideDismissable(
+    record: DismissableLayerRecord,
+    x: number,
+    y: number,
+    context: PresentationClipInputContext,
+  ): boolean {
+    if (record.parent === null) {
+      if (!record.regions.some((region) => pointInsideRect({x, y}, region))) return false
+      return this.#pointInsidePresentationClips(record.presentationClips, context)
+    }
+    const broadPhase = record.regions.some((region) => {
+      const projected = this.#retainedRectBroadPhase(record.parent!, region, context)
+      return projected !== null && pointInsideRect({x, y}, projected)
+    })
+    if (!broadPhase || !this.#pointInsidePresentationClips(record.presentationClips, context)) return false
+    const point = this.#retainedLocalPoint(record.parent, context)
+    return point !== null && record.regions.some((region) => pointInsideRect(point, region))
   }
 
   #dismissLayer(record: DismissableLayerRecord, reason: "outside" | "escape"): void {
@@ -2445,18 +2629,25 @@ export abstract class UiSurface implements UiSurfaceNode {
     this.requestKeyedRender(record.key)
   }
 
-  #retainedHitAt(x: number, y: number): ResolvedHitBox | null {
+  #retainedHitAt(
+    x: number,
+    y: number,
+    context: PresentationClipInputContext,
+  ): ResolvedHitBox | null {
     const records = this.#retainedRecordsInPaintOrder(this.#retainedHits)
     for (let index = records.length - 1; index >= 0; index -= 1) {
       const record = records[index]!
-      if (!this.#pointInsidePresentationClips({x, y}, record.presentationClips)) continue
       const viewport = this.#retainedViewportClip(record.parent)
       if (!pointInsideClip({x, y}, viewport)) continue
-      const localPoint = this.surfaceToRetainedPoint(record.parent, {x, y})
-      const intrinsic = pointInsideRect(localPoint, record)
-      const projected = this.retainedToSurfaceRect(record.parent, record)
+      const projected = this.#retainedRectBroadPhase(record.parent, record, context)
+      if (projected === null) continue
       const target = expandRectToMinimum(projected, record.screenMinimum)
-      if (!intrinsic && (record.screenMinimum === undefined || !pointInsideRect({x, y}, target))) continue
+      if (!pointInsideRect({x, y}, target)) continue
+      if (!this.#pointInsidePresentationClips(record.presentationClips, context)) continue
+      if (record.screenMinimum === undefined) {
+        const localPoint = this.#retainedLocalPoint(record.parent, context)
+        if (localPoint === null || !pointInsideRect(localPoint, record)) continue
+      }
       return this.#resolveRetainedHit(record, target)
     }
     return null
@@ -2498,27 +2689,36 @@ export abstract class UiSurface implements UiSurfaceNode {
     return resolved
   }
 
-  #wheelHitAt(x: number, y: number): WheelHitBox | null {
-    const retained = this.#retainedWheelHitAt(x, y)
+  #wheelHitAt(
+    x: number,
+    y: number,
+    context = this.#createPresentationClipInputContext(x, y),
+  ): WheelHitBox | null {
+    const retained = this.#retainedWheelHitAt(x, y, context)
     if (retained !== null) return retained
     for (let i = this.#wheelHits.length - 1; i >= 0; i--) {
       const h = this.#wheelHits[i]!
       if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h &&
-        this.#pointInsidePresentationClips({x, y}, h.presentationClips)) return h
+        this.#pointInsidePresentationClips(h.presentationClips, context)) return h
     }
     return null
   }
 
-  #retainedWheelHitAt(x: number, y: number): ResolvedWheelHitBox | null {
+  #retainedWheelHitAt(
+    x: number,
+    y: number,
+    context: PresentationClipInputContext,
+  ): ResolvedWheelHitBox | null {
     const records = this.#retainedRecordsInPaintOrder(this.#retainedWheelHits)
     for (let index = records.length - 1; index >= 0; index -= 1) {
       const record = records[index]!
-      if (!this.#pointInsidePresentationClips({x, y}, record.presentationClips)) continue
       const viewport = this.#retainedViewportClip(record.parent)
       if (!pointInsideClip({x, y}, viewport)) continue
-      const localPoint = this.surfaceToRetainedPoint(record.parent, {x, y})
-      if (!pointInsideRect(localPoint, record)) continue
-      const projected = this.retainedToSurfaceRect(record.parent, record)
+      const projected = this.#retainedRectBroadPhase(record.parent, record, context)
+      if (projected === null || !pointInsideRect({x, y}, projected)) continue
+      if (!this.#pointInsidePresentationClips(record.presentationClips, context)) continue
+      const localPoint = this.#retainedLocalPoint(record.parent, context)
+      if (localPoint === null || !pointInsideRect(localPoint, record)) continue
       return {
         x: projected.x,
         y: projected.y,
@@ -2650,7 +2850,11 @@ export abstract class UiSurface implements UiSurfaceNode {
     else this.#retainedHits.set(parent, [...hits])
 
     if (hovered?.retainedParent === parent) {
-      const next = this.#retainedHitAt(this.#pointerX, this.#pointerY)
+      const next = this.#retainedHitAt(
+        this.#pointerX,
+        this.#pointerY,
+        this.#createPresentationClipInputContext(this.#pointerX, this.#pointerY),
+      )
       if (next?.retainedParent === parent && next.key === hovered.key) {
         this.hoveredHit = next
         this.#hoveredHitKey = next.key
@@ -2960,20 +3164,15 @@ function matrixCanTransformPresentationClip(matrix: Matrix4): boolean {
   return Number.isFinite(determinant) && determinant !== 0
 }
 
-function pointInsidePresentationClip(worldPoint: Vector3, shape: PresentationClipShape): boolean {
+function pointInsidePresentationClip(localPoint: Vector3, shape: PresentationClipShape): boolean {
   if (shape.kind !== "rounded-rect") return false
-  const matrix = shape.coordinateSpace?.matrixWorld
-  if (matrix === undefined || !matrixCanTransformPresentationClip(matrix)) return false
   const [centerX, centerY] = shape.center
   const [halfWidth, halfHeight] = shape.halfSize
   const radii = [...shape.radii]
-  if (![centerX, centerY, halfWidth, halfHeight, ...radii].every(Number.isFinite)) return false
+  if (![localPoint.x, localPoint.y, localPoint.z, centerX, centerY, halfWidth, halfHeight, ...radii].every(Number.isFinite)) return false
   if (!(halfWidth > 0) || !(halfHeight > 0) || !radii.every((radius) => radius >= 0)) return false
   const radiusMax = Math.min(halfWidth, halfHeight)
   for (let index = 0; index < radii.length; index++) radii[index] = Math.min(radiusMax, radii[index]!)
-  const localPoint = new Vector3(worldPoint.x, worldPoint.y, worldPoint.z)
-    .applyMatrix4(new Matrix4().copy(matrix).invert())
-  if (![localPoint.x, localPoint.y, localPoint.z].every(Number.isFinite)) return false
   const x = localPoint.x - centerX
   const y = localPoint.y - centerY
   const radius = x <= 0 && y > 0
