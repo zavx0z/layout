@@ -1928,8 +1928,10 @@ export abstract class UiSurface implements UiSurfaceNode {
   onPointerDown(_event: MouseEvent, localX: number, localY: number): void {
     const innerX = localX - this.#padLeft
     const innerY = localY - this.#padTop
-    const context = this.#createPresentationClipInputContext(innerX, innerY)
-    this.#dismissOutside(innerX, innerY, context)
+    let context = this.#createPresentationClipInputContext(innerX, innerY)
+    if (this.#dismissOutside(innerX, innerY, context)) {
+      context = this.#createPresentationClipInputContext(innerX, innerY)
+    }
     const hit = this.#hitAt(innerX, innerY, context)
     if (hit === null) return
     this.pressedHit = hit
@@ -2134,6 +2136,7 @@ export abstract class UiSurface implements UiSurfaceNode {
 
   #refreshRetainedRootPresentationClip(): void {
     const previous = this.#rootPresentationClipShape
+    if (this.#rootPresentationClipMatchesCurrent(previous)) return
     const next = this.#createRootPresentationClip()
     this.#rootPresentationClipShape = next
     if (previous === null) return
@@ -2166,6 +2169,27 @@ export abstract class UiSurface implements UiSurfaceNode {
         presentationClips: replace(record.presentationClips),
       })))
     }
+  }
+
+  #rootPresentationClipMatchesCurrent(previous: PresentationClipShape | null): boolean {
+    if (!(this.#borderRadiusPx > 0)) return previous === null
+    if (previous === null || previous.kind !== "rounded-rect" || previous.coordinateSpace !== this.#retainedLayer) {
+      return false
+    }
+    const halfWidth = this.#fullRectW * this.pixelScale / 2
+    const halfHeight = this.#fullRectH * this.pixelScale / 2
+    const centerX = (-this.#padLeft + this.#fullRectW / 2) * this.pixelScale
+    const centerY = -(-this.#padTop + this.#fullRectH / 2) * this.pixelScale
+    const rawRadius = this.#borderRadiusPx * this.pixelScale
+    const valuesValid = [halfWidth, halfHeight, rawRadius].every(Number.isFinite)
+    const radius = valuesValid && halfWidth > 0 && halfHeight > 0 && rawRadius >= 0
+      ? Math.min(Math.min(halfWidth, halfHeight), rawRadius)
+      : rawRadius
+    return sameClipNumber(previous.center[0], centerX) &&
+      sameClipNumber(previous.center[1], centerY) &&
+      sameClipNumber(previous.halfSize[0], halfWidth) &&
+      sameClipNumber(previous.halfSize[1], halfHeight) &&
+      previous.radii.every((value) => sameClipNumber(value, radius))
   }
 
   #resolvePresentationClip(shape: UiClipShape): PresentationClipShape {
@@ -2538,7 +2562,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     context: PresentationClipInputContext,
   ): UiSurfaceRect | null {
     if (!this.#ensurePresentationClipInputMatrices(context) || context.surfaceInverse === null) return null
-    if (!parent.matrixWorld.elements.every(Number.isFinite)) return null
+    if (!matrixCanTransformPresentationClip(parent.matrixWorld)) return null
     const point = context.projectionScratch
     let xMin = Number.POSITIVE_INFINITY
     let yMin = Number.POSITIVE_INFINITY
@@ -2592,10 +2616,11 @@ export abstract class UiSurface implements UiSurfaceNode {
     x: number,
     y: number,
     context = this.#createPresentationClipInputContext(x, y),
-  ): void {
+  ): boolean {
     const record = this.#topDismissableLayer()
-    if (record === null || this.#pointInsideDismissable(record, x, y, context)) return
+    if (record === null || this.#pointInsideDismissable(record, x, y, context)) return false
     this.#dismissLayer(record, "outside")
+    return true
   }
 
   #topDismissableLayer(): DismissableLayerRecord | null {
@@ -3162,6 +3187,10 @@ function matrixCanTransformPresentationClip(matrix: Matrix4): boolean {
   if (!matrix.elements.every(Number.isFinite)) return false
   const determinant = matrix.determinant()
   return Number.isFinite(determinant) && determinant !== 0
+}
+
+function sameClipNumber(a: number, b: number): boolean {
+  return a === b || (Number.isNaN(a) && Number.isNaN(b))
 }
 
 function pointInsidePresentationClip(localPoint: Vector3, shape: PresentationClipShape): boolean {

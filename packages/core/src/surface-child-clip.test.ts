@@ -47,15 +47,21 @@ class ChildClipTestSurface extends UiSurface {
     this.removeRetainedParent(parent)
   }
 
-  screenMinimumHit(parent: Object3D, shape: UiClipShape): void {
+  screenMinimumHit(parent: Object3D, shape?: UiClipShape, key = "minimum"): void {
     this.materializeRetainedParent(parent, () => {
-      this.withChildClip(shape, () => {
+      const draw = () => {
         this.retainedHit(parent, 18, 18, 4, 4, () => {}, {
-          key: "minimum",
+          key,
           screenMinimum: {width: 40, height: 40},
         })
-      })
+      }
+      if (shape === undefined) draw()
+      else this.withChildClip(shape, draw)
     })
+  }
+
+  hoveredRecord(): unknown {
+    return this.hoveredHit
   }
 
   wheelAt(x: number, y: number): boolean {
@@ -241,6 +247,50 @@ describe("UiSurface scoped child clips", () => {
     parent.scale.x = 0
     parent.updateMatrix()
     expect(surface.pointerHitKey(20, 20)).toBeNull()
+    surface.dispose()
+
+    const unscoped = setupSurface().surface
+    const singularParent = unscoped.createParent()
+    unscoped.screenMinimumHit(singularParent, undefined, "singular-minimum")
+    singularParent.scale.x = 0
+    singularParent.updateMatrix()
+    expect(unscoped.pointerHitKey(0, 20)).toBeNull()
+    unscoped.dispose()
+  })
+
+  test("rebuilds pointerDown clip context after synchronous dismissal changes the retained owner", () => {
+    const {surface} = setupSurface()
+    const parent = surface.createParent()
+    let dismissals = 0
+    let pointerDowns = 0
+    const drawReplacement = () => {
+      surface.withChildClip({kind: "rounded-rect", x: 0, y: 0, w: 40, h: 40, radius: 20}, () => {
+        surface.hit(0, 0, 40, 40, () => {}, {
+          key: "replacement-hit",
+          onPointerDown: () => { pointerDowns += 1 },
+        })
+      })
+    }
+    surface.materialize(parent, () => {
+      surface.withChildClip({kind: "rounded-rect", x: 0, y: 0, w: 40, h: 40, radius: 20}, () => {
+        surface.dismissableLayer({
+          key: "moving-dismiss",
+          regions: [{x: 0, y: 0, w: 40, h: 40}],
+          dismiss: () => {
+            dismissals += 1
+            surface.transform(parent, (target) => target.position.set(-0.019, 0.019, 0))
+            surface.materialize(parent, drawReplacement)
+          },
+        })
+        surface.hit(0, 0, 40, 40, () => {}, {key: "original-hit"})
+      })
+    })
+
+    surface.onPointerDown({button: 0} as MouseEvent, 1, 1)
+    expect(dismissals).toBe(1)
+    expect(pointerDowns).toBe(1)
+    expect(surface.pointerHitKey(1, 1)).toBe("replacement-hit")
+    surface.dispose()
   })
 
   test("rolls back retained clip metadata and records atomically", () => {
@@ -389,8 +439,39 @@ describe("UiSurface scoped child clips", () => {
     expect(wheels).toBe(1)
     surface.onPointerDown({button: 0} as MouseEvent, 150, 80)
     expect(dismissals).toBe(1)
+    surface.onPointerUp({button: 0} as MouseEvent, 150, 80)
 
     const resizedClips = visual.presentationClips
+    const resizedPortalClips = portalVisual.presentationClips
+    surface.onPointerMove({} as MouseEvent, 150, 80)
+    const hovered = surface.hoveredRecord()
+    expect(hovered).not.toBeNull()
+    let visualClipWrites = 0
+    let portalClipWrites = 0
+    let visualClipValue = visual.presentationClips
+    let portalClipValue = portalVisual.presentationClips
+    Object.defineProperty(visual, "presentationClips", {
+      configurable: true,
+      get: () => visualClipValue,
+      set: (next: typeof visual.presentationClips) => {
+        visualClipWrites += 1
+        visualClipValue = next
+      },
+    })
+    Object.defineProperty(portalVisual, "presentationClips", {
+      configurable: true,
+      get: () => portalClipValue,
+      set: (next: typeof portalVisual.presentationClips) => {
+        portalClipWrites += 1
+        portalClipValue = next
+      },
+    })
+    surface.setRect({x: 0, y: 0, w: 200, h: 160}, 0.001, font)
+    expect(visual.presentationClips).toBe(resizedClips)
+    expect(portalVisual.presentationClips).toBe(resizedPortalClips)
+    expect(surface.hoveredRecord()).toBe(hovered)
+    expect({visualClipWrites, portalClipWrites}).toEqual({visualClipWrites: 0, portalClipWrites: 0})
+
     surface.moveRect({x: 20, y: 30, w: 200, h: 160}, 0.001, font)
     expect(visual.presentationClips).toBe(resizedClips)
     expect(() => surface.moveRect({x: 20, y: 30, w: 200, h: 160}, 0.002, font))
