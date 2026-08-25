@@ -1,0 +1,57 @@
+---
+name: layout-dev
+description: "Develop and verify the standalone Layout repository, @layout/core UI runtime, HUD and spatial displays, tests, and static Storybook. Use for Layout implementation or repository-level development; use ui-dev, nodes-dev, or metafor-dev for consumer-owned behavior."
+---
+
+# Layout development
+
+Built for [MetaFor](https://github.com/zavx0z/metafor) as a reusable UI engine
+for HUDs, virtual displays, and immersive WebGPU interfaces.
+
+Use the exact Layout checkout supplied for the task. Preserve its branch or
+detached HEAD, unrelated changes, linked dependency identity, listeners, and
+browser targets. Before changing a contract, read `ARCHITECTURE.md`, the
+affected public types and implementation, and focused tests.
+
+`@layout/core` owns `UiRuntime`, `UiSurface`, retained input and clipping,
+logical-pixel/world-unit conversion, HUD and spatial `UIDisplay` targets,
+`UITexture`, display navigation, and deterministic FlexBox planning. Engine
+owns rendering primitives and `Space`; UI owns visual controls; Nodes owns node
+authoring; MetaFor owns product semantics. Import the exact public owner and do
+not add aliases, compatibility re-exports, or a reverse dependency.
+
+One product runtime owns one retained Engine renderer and Space. Surfaces attach
+to that runtime instead of creating a renderer or scene per component. Flat HUD
+and optional spatial-display behavior must remain coherent.
+
+## Checks
+
+Run focused tests while iterating, then:
+
+```bash
+bun run typecheck
+bun run test
+bun run pages
+git diff --check
+```
+
+`bun run check` covers typecheck and tests. `bun run pages` separately proves
+the static `/layout/` artifact. Before accepting linked integration, verify that
+`@engine/core` resolves to the intended Engine checkout or immutable revision;
+a global Bun link is a temporary overlay, not release evidence.
+
+## Storybook and evidence
+
+`bun run storybook` builds and serves the catalog at
+`http://127.0.0.1:4020`. Inspect listener ownership before starting it and never
+adopt or stop a foreign process. Restart the exact owned process after a stable
+source checkpoint when the build is stale.
+
+For visual or input changes, verify the exact flat-HUD and spatial-display
+stories affected, console output, and the rendered WebGPU result. A static build
+or unit test alone does not prove browser behavior. Keep WebGPU Inspector
+external to repository source and public artifacts.
+
+At handoff report the checkout and revision, Engine dependency identity,
+focused and repository checks, Pages build, exact live route and visual evidence
+where applicable, and every remaining consumer or owner gate.

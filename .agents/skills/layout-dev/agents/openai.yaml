@@ -1,0 +1,4 @@
+interface:
+  display_name: "Layout Development"
+  short_description: "Develop the immersive UI engine"
+  default_prompt: "Use $layout-dev to implement and verify a Layout runtime change across tests and its static Storybook."
