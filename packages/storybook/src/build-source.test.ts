@@ -78,7 +78,7 @@ describe("Layout Storybook static build source", () => {
     const workflow = await Bun.file(new URL("../../../.github/workflows/pages.yml", import.meta.url)).text()
 
     expect(ignore.split(/\r?\n/)).toContain("dist/")
-    expect(workflow).toContain("          path: dist")
+    expect(workflow).toContain("          path: layout/dist")
     expect(workflow).not.toContain("path: packages/storybook/pages")
   })
 
@@ -110,11 +110,38 @@ describe("Layout Storybook static build source", () => {
       "name: Install Layout dependencies",
       "name: Check Layout",
       "name: Build static Layout Storybook",
+      "name: Verify clean manifest identities",
     ]
     const positions = bootstrap.map((marker) => workflow.indexOf(marker))
     expect(positions.every((position) => position >= 0)).toBeTrue()
     expect(positions).toEqual([...positions].sort((left, right) => left - right))
     expect(workflow.match(/run: bun link/g)?.length).toBe(6)
     expect(workflow.match(/bun install --frozen-lockfile/g)?.length).toBe(4)
+    expect(workflow).not.toContain(".deps/")
+    expect([...workflow.matchAll(/^\s+path: ([^\n]+)/gm)].map((match) => match[1])).toEqual([
+      "layout",
+      "engine",
+      "ui",
+      "highlighter",
+      "storybook",
+      "layout/dist",
+    ])
+    expect([...workflow.matchAll(/working-directory: ([^\n]+)/g)].map((match) => match[1])).toEqual([
+      "engine/packages/core",
+      "layout/packages/core",
+      "ui/packages/elements",
+      "ui/packages/components",
+      "highlighter",
+      "highlighter",
+      "storybook",
+      "storybook",
+      "ui",
+      "layout",
+      "layout",
+      "layout",
+      "layout",
+    ])
+    expect(workflow).toContain("manifest.source.dirty")
+    expect(workflow).toContain("manifest.dependencies.some((dependency) => dependency.dirty)")
   })
 })

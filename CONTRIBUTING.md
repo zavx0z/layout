@@ -16,6 +16,10 @@ Please open an issue before broad API redesigns so Engine, UI, Node, and MetaFor
 
 ## Pages bootstrap
 
-The manual Pages workflow checks out exact Engine, UI, Highlighter, and shared
-Storybook revisions. It registers each direct package owner before the locked
-dependency installs, then runs the Layout checks and static `/layout/` build.
+The manual Pages workflow checks out Layout and its exact Engine, UI,
+Highlighter, and shared Storybook revisions into sibling directories. This
+keeps dependency setup outside the Layout Git tree so the static manifest stays
+clean. It registers each direct package owner before the locked dependency
+installs, then runs the Layout checks and static `/layout/` build. The job
+rejects the artifact if its source or any dependency still reports
+`dirty: true`.
