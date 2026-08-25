@@ -40,6 +40,12 @@ the static `/layout/` artifact. Before accepting linked integration, verify that
 `@engine/core` resolves to the intended Engine checkout or immutable revision;
 a global Bun link is a temporary overlay, not release evidence.
 
+GitHub Pages deployment is manual and owner-gated. Never dispatch
+`.github/workflows/pages.yml`, run `gh workflow run`, change repository Pages
+settings, or deploy an artifact unless the owner explicitly requests deployment
+in the current task. `bun run pages` and checks verify an artifact; they do not
+authorize publishing it.
+
 ## Storybook and evidence
 
 `bun run storybook` builds and serves the catalog at
