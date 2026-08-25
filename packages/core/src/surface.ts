@@ -63,6 +63,7 @@ import {
   MeshBasicMaterial,
   Object3D,
   PlaneGeometry,
+  type PresentationClipShape,
   RadialBackdropMaterial,
   RoundedRectMaterial,
   CachedText,
@@ -170,6 +171,20 @@ export type HitState = {
 
 export type UiSurfacePadding = number | {top?: number; right?: number; bottom?: number; left?: number}
 
+/** One radius for every corner or exact top-left clockwise corner radii. */
+export type UiClipRadius = number | Readonly<{tl: number; tr: number; br: number; bl: number}>
+
+/**
+ * One child presentation clip in the active Surface/retained local coordinate
+ * space. Rectangles use zero radii in the Engine presentation chain. Width,
+ * height, coordinates, and radii must be finite; width/height must be positive
+ * and radii non-negative. Invalid shapes and non-invertible coordinate spaces
+ * fail closed, while valid radii are capped at half the smaller dimension.
+ */
+export type UiClipShape =
+  | Readonly<{kind: "rect"; x: number; y: number; w: number; h: number}>
+  | Readonly<{kind: "rounded-rect"; x: number; y: number; w: number; h: number; radius: UiClipRadius}>
+
 /**
  * Generic Surface chrome and content-inset options.
  *
@@ -185,8 +200,8 @@ export type UiSurfaceOpts = {
    * Visual rounding of the outer background and border chrome in logical px.
    * Default 0.
    *
-   * This does not currently establish a rounded descendant or input clip. The
-   * missing rounded parity is recorded explicitly under LAYOUT-CLIP-001.
+   * A positive radius also establishes the root `withChildClip`-equivalent
+   * boundary for ordinary Surface content, pointer hits, and wheel targets.
    */
   borderRadiusPx?: number
   /**
@@ -351,6 +366,7 @@ type RetainedHitRecord = {
   onPointerMove?: (localX: number, localY: number, event?: MouseEvent) => void
   onPointerUp?: (event?: MouseEvent) => void
   screenMinimum?: RetainedHitScreenMinimum
+  presentationClips: readonly PresentationClipShape[]
 }
 
 type RetainedWheelHitRecord = Readonly<{
@@ -362,6 +378,7 @@ type RetainedWheelHitRecord = Readonly<{
   h: number
   key: string
   onWheel(event: WheelEvent): void
+  presentationClips: readonly PresentationClipShape[]
 }>
 
 export type DismissReason = "outside" | "escape" | "replaced"
@@ -374,6 +391,7 @@ export type DismissableLayerOptions = Readonly<{
 
 type DismissableLayerRecord = DismissableLayerOptions & Readonly<{
   parent: Object3D | null
+  presentationClips: readonly PresentationClipShape[]
 }>
 
 type RetainedDismissableLayerRecord = DismissableLayerRecord & Readonly<{
@@ -381,8 +399,16 @@ type RetainedDismissableLayerRecord = DismissableLayerRecord & Readonly<{
   overlayPortal: boolean
 }>
 
-type ResolvedHitBox = HitBox & Readonly<{retainedParent?: Object3D}>
-type ResolvedWheelHitBox = WheelHitBox & Readonly<{retainedParent?: Object3D}>
+type ImmediateHitBox = HitBox & Readonly<{presentationClips: readonly PresentationClipShape[]}>
+type ImmediateWheelHitBox = WheelHitBox & Readonly<{presentationClips: readonly PresentationClipShape[]}>
+type ResolvedHitBox = HitBox & Readonly<{
+  retainedParent?: Object3D
+  presentationClips: readonly PresentationClipShape[]
+}>
+type ResolvedWheelHitBox = WheelHitBox & Readonly<{
+  retainedParent?: Object3D
+  presentationClips: readonly PresentationClipShape[]
+}>
 
 const RETAINED_UNBOUNDED_CLIP: ClipLocalRect = {
   xMin: Number.NEGATIVE_INFINITY,
@@ -435,11 +461,10 @@ export const Z: {
  *
  * Independently dirty subtrees are created through `createRetainedParent` and
  * atomically drawn through `materializeRetainedParent`. Transform, visibility,
- * and rectangular viewport-clip updates operate on that same parent identity
- * and do not rematerialize unchanged children.
- *
- * Rounded descendant/input clip parity is a normative requirement but is not
- * implemented by the current rectangular clip APIs.
+ * and viewport-clip updates operate on that same parent identity and do not
+ * rematerialize unchanged children. `withChildClip` snapshots one analytical
+ * clip chain for emitted pixels and input records; the Engine evaluates each
+ * shape in its exact Surface-owned coordinate space.
  *
  * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
  * @see [LAYOUT-CLIP-001](../requirements.md#clip-parity)
@@ -506,6 +531,8 @@ export abstract class UiSurface implements UiSurfaceNode {
   readonly #retainedViewportClips = new Map<Object3D, ClipLocalRect>()
   readonly #retainedOverlayPortals = new Map<Object3D, RetainedOverlayPortal>()
   #retainedMaterialization: RetainedMaterialization | null = null
+  readonly #presentationClipStack: PresentationClipShape[] = []
+  #suppressPresentationClipsDepth = 0
   #drawLayer: UiSurfaceDrawLayer = "main"
   #framebufferDisplayId: UiDisplayId = "default"
   /** Padding в logical px (top, right, bottom, left). */
@@ -513,8 +540,8 @@ export abstract class UiSurface implements UiSurfaceNode {
   readonly #padRight: number
   readonly #padBottom: number
   readonly #padLeft: number
-  #hits: HitBox[] = []
-  #wheelHits: WheelHitBox[] = []
+  #hits: ImmediateHitBox[] = []
+  #wheelHits: ImmediateWheelHitBox[] = []
   #dismissables: DismissableLayerRecord[] = []
   protected hoveredHit: HitBox | null = null
   protected pressedHit: HitBox | null = null
@@ -828,6 +855,7 @@ export abstract class UiSurface implements UiSurfaceNode {
       key,
       regions,
       dismiss: options.dismiss,
+      presentationClips: this.#presentationClipSnapshot(),
       ...(transaction === null ? {} : {overlayPortal: transaction.overlayDepth > 0}),
     }
     if (transaction === null) this.#dismissables.push(record)
@@ -886,6 +914,26 @@ export abstract class UiSurface implements UiSurfaceNode {
       draw()
     } finally {
       this.#drawLayer = prev
+    }
+  }
+
+  /**
+   * Runs one synchronous child draw inside an immutable analytical clip scope.
+   * Nested scopes intersect for emitted pixels, pointer hits, wheel targets,
+   * and dismissable regions. The scope is always restored when `draw` throws.
+   *
+   * `pushClip`/`popClip` remains the rectangular broad-phase primitive; only
+   * this API establishes descendant presentation/input parity.
+   *
+   * @see [LAYOUT-CLIP-001](../requirements.md#clip-parity)
+   */
+  withChildClip(shape: UiClipShape, draw: () => void): void {
+    const presentationClip = this.#resolvePresentationClip(shape)
+    this.#presentationClipStack.push(presentationClip)
+    try {
+      draw()
+    } finally {
+      this.#presentationClipStack.pop()
     }
   }
 
@@ -1070,8 +1118,8 @@ export abstract class UiSurface implements UiSurfaceNode {
    * Sets one rectangular surface-local viewport clip without rematerializing
    * its subtree or replacing retained identities.
    *
-   * This API does not implement the rounded descendant/input parity still
-   * required by LAYOUT-CLIP-001.
+   * This remains a rectangular broad-phase API. Use `withChildClip` for the
+   * shared analytical pixel/input boundary required by LAYOUT-CLIP-001.
    *
    * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
    * @see [LAYOUT-CLIP-001](../requirements.md#clip-parity)
@@ -1186,6 +1234,7 @@ export abstract class UiSurface implements UiSurfaceNode {
       key: options.key ?? hitKeyFor(x, y, w, h),
       action,
       cursor: options.cursor ?? "pointer",
+      presentationClips: this.#presentationClipSnapshot(),
     }
     if (options.activeCursor !== undefined) record.activeCursor = options.activeCursor
     if (options.tooltip !== undefined) record.tooltip = options.tooltip
@@ -1267,7 +1316,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     }
     text.updateMatrix()
     if (opts.clip !== false) this.#applyClipTo(text)
-    this.#currentLayer().add(text)
+    this.#addVisual(this.#currentLayer(), text)
     return opts.measure === false ? 0 : this.measureText(fitted, opts.fontPx, opts.letterSpacingPx, opts.spaceAdvancePx)
   }
 
@@ -1393,7 +1442,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.position.y = -(y0 + ch / 2) * this.pixelScale
     mesh.position.z = z
     mesh.updateMatrix()
-    this.#currentLayer().add(mesh)
+    this.#addVisual(this.#currentLayer(), mesh)
   }
 
   drawLine(x0: number, y0: number, x1: number, y1: number, color: Color, thicknessPx = 2, z = Z.ELEMENT): void {
@@ -1412,7 +1461,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.position.z = z
     mesh.rotation.z = -Math.atan2(dy, dx)
     mesh.updateMatrix()
-    this.#currentLayer().add(mesh)
+    this.#addVisual(this.#currentLayer(), mesh)
   }
 
   drawRoundedLine(x0: number, y0: number, x1: number, y1: number, color: Color, thicknessPx = 2, z = Z.ELEMENT): void {
@@ -1439,7 +1488,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.position.z = z
     mesh.rotation.z = -Math.atan2(dy, dx)
     mesh.updateMatrix()
-    this.#currentLayer().add(mesh)
+    this.#addVisual(this.#currentLayer(), mesh)
   }
 
   /**
@@ -1455,7 +1504,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.scale.set(this.pixelScale, -this.pixelScale, 1)
     mesh.position.z = z
     mesh.updateMatrix()
-    this.#currentLayer().add(mesh)
+    this.#addVisual(this.#currentLayer(), mesh)
   }
 
   drawImage(src: string, x: number, y: number, w: number, h: number, opts: DrawImageOpts = {}): void {
@@ -1479,7 +1528,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.position.y = -(h / 2) * ps
     mesh.position.z = opts.z ?? -0.18
     mesh.updateMatrix()
-    this.#currentLayer().add(mesh)
+    this.#addVisual(this.#currentLayer(), mesh)
   }
 
   /** Draws one texture-free analytical quad for a color wheel or vertical slider. */
@@ -1512,7 +1561,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.position.y = -(y + h / 2) * ps
     mesh.position.z = opts.z ?? Z.ELEMENT
     mesh.updateMatrix()
-    this.#currentLayer().add(mesh)
+    this.#addVisual(this.#currentLayer(), mesh)
   }
 
   drawTooltipForHit(
@@ -1585,9 +1634,14 @@ export abstract class UiSurface implements UiSurfaceNode {
     const pending = this.#pendingTooltipDraws
     this.#pendingTooltipDraws = []
     if (pending.length === 0) return
-    this.withLayer("overlay", () => {
-      for (const tooltip of pending) this.#drawTooltipNow(tooltip)
-    })
+    this.#suppressPresentationClipsDepth += 1
+    try {
+      this.withLayer("overlay", () => {
+        for (const tooltip of pending) this.#drawTooltipNow(tooltip)
+      })
+    } finally {
+      this.#suppressPresentationClipsDepth -= 1
+    }
   }
 
   /**
@@ -1633,7 +1687,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.position.y = -(y + h / 2) * ps
     mesh.position.z = opts.z ?? Z.ELEMENT
     mesh.updateMatrix()
-    this.#currentLayer().add(mesh)
+    this.#addVisual(this.#currentLayer(), mesh)
   }
 
   /**
@@ -1698,7 +1752,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.position.y = -(y + h / 2) * ps
     mesh.position.z = opts.z !== undefined && Number.isFinite(opts.z) ? opts.z : Z.CONTAINER
     mesh.updateMatrix()
-    this.#currentLayer().add(mesh)
+    this.#addVisual(this.#currentLayer(), mesh)
   }
 
   /** Точное измерение ширины текста через font advance + letter-spacing.
@@ -1769,7 +1823,7 @@ export abstract class UiSurface implements UiSurfaceNode {
       this.#stageRetainedHit(transaction.target, x, y, w, h, action, options)
       return
     }
-    const hit: HitBox = {
+    const hit: ImmediateHitBox = {
       x,
       y,
       w,
@@ -1777,6 +1831,7 @@ export abstract class UiSurface implements UiSurfaceNode {
       key: options.key ?? hitKeyFor(x, y, w, h),
       action,
       cursor: options.cursor ?? "pointer",
+      presentationClips: this.#presentationClipSnapshot(),
     }
     if (options.activeCursor !== undefined) hit.activeCursor = options.activeCursor
     if (options.tooltip !== undefined) hit.tooltip = options.tooltip
@@ -1804,6 +1859,7 @@ export abstract class UiSurface implements UiSurfaceNode {
         h,
         key: key ?? hitKeyFor(x, y, w, h),
         onWheel,
+        presentationClips: this.#presentationClipSnapshot(),
       })
       transaction.renderKeys.add(key ?? hitKeyFor(x, y, w, h))
       return
@@ -1815,6 +1871,7 @@ export abstract class UiSurface implements UiSurfaceNode {
       h,
       key: key ?? hitKeyFor(x, y, w, h),
       onWheel,
+      presentationClips: this.#presentationClipSnapshot(),
     })
   }
 
@@ -2028,6 +2085,45 @@ export abstract class UiSurface implements UiSurfaceNode {
     this.#rerender()
   }
 
+  #addVisual(parent: Object3D, visual: Object3D): void {
+    visual.presentationClips = this.#presentationClipSnapshot()
+    parent.add(visual)
+  }
+
+  #presentationClipSnapshot(): readonly PresentationClipShape[] {
+    if (this.#suppressPresentationClipsDepth > 0) return Object.freeze([])
+    const root = this.#rootPresentationClip()
+    if (root === null && this.#presentationClipStack.length === 0) return Object.freeze([])
+    return Object.freeze([
+      ...(root === null ? [] : [root]),
+      ...this.#presentationClipStack,
+    ])
+  }
+
+  #rootPresentationClip(): PresentationClipShape | null {
+    if (!(this.#borderRadiusPx > 0)) return null
+    return createPresentationClipShape(
+      this.#retainedLayer,
+      {
+        kind: "rounded-rect",
+        x: -this.#padLeft,
+        y: -this.#padTop,
+        w: this.#fullRectW,
+        h: this.#fullRectH,
+        radius: this.#borderRadiusPx,
+      },
+      this.pixelScale,
+    )
+  }
+
+  #resolvePresentationClip(shape: UiClipShape): PresentationClipShape {
+    return createPresentationClipShape(
+      this.#retainedMaterialization?.target ?? this.#retainedLayer,
+      shape,
+      this.pixelScale,
+    )
+  }
+
   #currentLayer(): Object3D {
     if (this.#retainedMaterialization !== null) {
       return this.#retainedMaterialization.overlayDepth > 0
@@ -2162,7 +2258,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     mesh.position.y = -(y + h / 2) * this.pixelScale
     mesh.position.z = z
     mesh.updateMatrix()
-    parent.add(mesh)
+    this.#addVisual(parent, mesh)
   }
 
   /**
@@ -2171,8 +2267,8 @@ export abstract class UiSurface implements UiSurfaceNode {
    * Пара push/pop обязательна. drawRect клампится в JS, на него clip-stack
    * не влияет (см. drawRect).
    *
-   * This is a rectangular primitive. It does not satisfy the rounded
-   * descendant/input parity recorded as unmet under LAYOUT-CLIP-001.
+   * This remains a rectangular broad-phase primitive. Use `withChildClip` for
+   * the shared analytical pixel/input boundary required by LAYOUT-CLIP-001.
    *
    * @see [LAYOUT-CLIP-001](../requirements.md#clip-parity)
    */
@@ -2300,12 +2396,27 @@ export abstract class UiSurface implements UiSurfaceNode {
     return this.canvas.uiRectToFramebufferClipBounds(xMin, yMin, xMax, yMax, this.#framebufferDisplayId)
   }
 
+  #pointInsidePresentationClips(
+    point: Readonly<{x: number; y: number}>,
+    clips: readonly PresentationClipShape[],
+  ): boolean {
+    if (clips.length === 0) return true
+    this.#updateRetainedMatrices()
+    const surfaceMatrix = this.#retainedLayer.matrixWorld
+    if (!matrixCanTransformPresentationClip(surfaceMatrix)) return false
+    const worldPoint = new Vector3(point.x * this.pixelScale, -point.y * this.pixelScale, 0)
+      .applyMatrix4(surfaceMatrix)
+    if (![worldPoint.x, worldPoint.y, worldPoint.z].every(Number.isFinite)) return false
+    return clips.every((clip) => pointInsidePresentationClip(worldPoint, clip))
+  }
+
   #hitAt(x: number, y: number): HitBox | null {
     const retained = this.#retainedHitAt(x, y)
     if (retained !== null) return retained
     for (let i = this.#hits.length - 1; i >= 0; i--) {
       const h = this.#hits[i]!
-      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h &&
+        this.#pointInsidePresentationClips({x, y}, h.presentationClips)) return h
     }
     return null
   }
@@ -2323,6 +2434,7 @@ export abstract class UiSurface implements UiSurfaceNode {
   }
 
   #pointInsideDismissable(record: DismissableLayerRecord, x: number, y: number): boolean {
+    if (!this.#pointInsidePresentationClips({x, y}, record.presentationClips)) return false
     const point = record.parent === null ? {x, y} : this.surfaceToRetainedPoint(record.parent, {x, y})
     return record.regions.some((region) => pointInsideRect(point, region))
   }
@@ -2337,6 +2449,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     const records = this.#retainedRecordsInPaintOrder(this.#retainedHits)
     for (let index = records.length - 1; index >= 0; index -= 1) {
       const record = records[index]!
+      if (!this.#pointInsidePresentationClips({x, y}, record.presentationClips)) continue
       const viewport = this.#retainedViewportClip(record.parent)
       if (!pointInsideClip({x, y}, viewport)) continue
       const localPoint = this.surfaceToRetainedPoint(record.parent, {x, y})
@@ -2363,6 +2476,7 @@ export abstract class UiSurface implements UiSurfaceNode {
       action: record.action,
       cursor: record.cursor,
       retainedParent: record.parent,
+      presentationClips: record.presentationClips,
     }
     if (record.activeCursor !== undefined) resolved.activeCursor = record.activeCursor
     if (record.tooltip !== undefined) resolved.tooltip = record.tooltip
@@ -2389,7 +2503,8 @@ export abstract class UiSurface implements UiSurfaceNode {
     if (retained !== null) return retained
     for (let i = this.#wheelHits.length - 1; i >= 0; i--) {
       const h = this.#wheelHits[i]!
-      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h &&
+        this.#pointInsidePresentationClips({x, y}, h.presentationClips)) return h
     }
     return null
   }
@@ -2398,6 +2513,7 @@ export abstract class UiSurface implements UiSurfaceNode {
     const records = this.#retainedRecordsInPaintOrder(this.#retainedWheelHits)
     for (let index = records.length - 1; index >= 0; index -= 1) {
       const record = records[index]!
+      if (!this.#pointInsidePresentationClips({x, y}, record.presentationClips)) continue
       const viewport = this.#retainedViewportClip(record.parent)
       if (!pointInsideClip({x, y}, viewport)) continue
       const localPoint = this.surfaceToRetainedPoint(record.parent, {x, y})
@@ -2411,6 +2527,7 @@ export abstract class UiSurface implements UiSurfaceNode {
         key: record.key,
         onWheel: record.onWheel,
         retainedParent: record.parent,
+        presentationClips: record.presentationClips,
       }
     }
     return null
@@ -2798,6 +2915,78 @@ function pointInsideRect(
   rect: Readonly<{x: number; y: number; w: number; h: number}>,
 ): boolean {
   return point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h
+}
+
+function createPresentationClipShape(
+  coordinateSpace: Object3D,
+  shape: UiClipShape,
+  pixelScale: number,
+): PresentationClipShape {
+  const halfWidth = shape.w * pixelScale / 2
+  const halfHeight = shape.h * pixelScale / 2
+  const rawRadii = shape.kind === "rect"
+    ? [0, 0, 0, 0] as const
+    : typeof shape.radius === "number"
+      ? [shape.radius, shape.radius, shape.radius, shape.radius] as const
+      : [shape.radius.tl, shape.radius.tr, shape.radius.br, shape.radius.bl] as const
+  const worldRadii = rawRadii.map((radius) => radius * pixelScale) as [number, number, number, number]
+  const valuesValid = [halfWidth, halfHeight, ...worldRadii].every(Number.isFinite)
+  const dimensionsValid = halfWidth > 0 && halfHeight > 0
+  const radiiValid = worldRadii.every((radius) => radius >= 0)
+  if (valuesValid && dimensionsValid && radiiValid) {
+    const radiusMax = Math.min(halfWidth, halfHeight)
+    for (let index = 0; index < worldRadii.length; index++) {
+      worldRadii[index] = Math.min(radiusMax, worldRadii[index]!)
+    }
+  }
+  const center = Object.freeze([
+    (shape.x + shape.w / 2) * pixelScale,
+    -(shape.y + shape.h / 2) * pixelScale,
+  ]) as readonly [number, number]
+  const halfSize = Object.freeze([halfWidth, halfHeight]) as readonly [number, number]
+  const radii = Object.freeze(worldRadii) as readonly [number, number, number, number]
+  return Object.freeze({
+    kind: "rounded-rect",
+    coordinateSpace,
+    center,
+    halfSize,
+    radii,
+  })
+}
+
+function matrixCanTransformPresentationClip(matrix: Matrix4): boolean {
+  if (!matrix.elements.every(Number.isFinite)) return false
+  const determinant = matrix.determinant()
+  return Number.isFinite(determinant) && determinant !== 0
+}
+
+function pointInsidePresentationClip(worldPoint: Vector3, shape: PresentationClipShape): boolean {
+  if (shape.kind !== "rounded-rect") return false
+  const matrix = shape.coordinateSpace?.matrixWorld
+  if (matrix === undefined || !matrixCanTransformPresentationClip(matrix)) return false
+  const [centerX, centerY] = shape.center
+  const [halfWidth, halfHeight] = shape.halfSize
+  const radii = [...shape.radii]
+  if (![centerX, centerY, halfWidth, halfHeight, ...radii].every(Number.isFinite)) return false
+  if (!(halfWidth > 0) || !(halfHeight > 0) || !radii.every((radius) => radius >= 0)) return false
+  const radiusMax = Math.min(halfWidth, halfHeight)
+  for (let index = 0; index < radii.length; index++) radii[index] = Math.min(radiusMax, radii[index]!)
+  const localPoint = new Vector3(worldPoint.x, worldPoint.y, worldPoint.z)
+    .applyMatrix4(new Matrix4().copy(matrix).invert())
+  if (![localPoint.x, localPoint.y, localPoint.z].every(Number.isFinite)) return false
+  const x = localPoint.x - centerX
+  const y = localPoint.y - centerY
+  const radius = x <= 0 && y > 0
+    ? radii[0]!
+    : x > 0 && y > 0
+      ? radii[1]!
+      : x > 0 && y <= 0
+        ? radii[2]!
+        : radii[3]!
+  const qx = Math.abs(x) - halfWidth + radius
+  const qy = Math.abs(y) - halfHeight + radius
+  const distance = Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - radius
+  return Number.isFinite(distance) && distance <= 0
 }
 
 function expandRectToMinimum(

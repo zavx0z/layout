@@ -74,10 +74,23 @@ same region for descendant pixels, pointer hits, wheel targets, and scrollbars.
 Nested clips intersect through the retained parent chain; no descendant may
 draw or respond outside the resulting region.
 
-**Current status: unmet for rounded descendant/input parity.** The current
-runtime provides rectangular Surface and retained viewport clip bounds, while
-`UiSurfaceOpts.borderRadiusPx` rounds Surface chrome only. A rounded parent does
-not yet provide one rounded mask for descendant pixels, pointer hits, wheel
-targets, and scrollbars. The requirement above is adopted, but this missing
-behaviour is not an implemented guarantee and requires a separate
-implementation and verification stage.
+**Current status: implemented at the Layout boundary.** `UiSurface.withChildClip`
+normalizes one immutable analytical shape chain and snapshots it onto every
+emitted Engine visual plus the corresponding immediate or retained pointer,
+wheel, and dismissable records. Nested scopes intersect outer-to-inner;
+retained portals keep the exact owner chain. `UiSurfaceOpts.borderRadiusPx`
+establishes the same root content/input boundary.
+
+The Engine evaluates each visual shape through its declared `Object3D`
+coordinate space, while Layout uses the same rounded-box predicate and corner
+order for CPU input. Invalid shapes and non-invertible transforms fail closed.
+Transform-, visibility-, and rectangular viewport-clip-only changes preserve
+retained parent, child, geometry, and scoped-chain identity. Transaction
+rollback, remove, and dispose preserve or release the complete matching visual
+and input evidence atomically.
+
+`pushClip`/`popClip` and retained viewport clips remain rectangular
+broad-phase primitives; they are not the shaped parity API. Focused proof is in
+`src/surface-child-clip.test.ts` and covers immediate and retained metadata,
+rounded hit/wheel rejection, nested scopes, screen-minimum input, rollback,
+transform, visibility, disposal, portal inheritance, and the Surface root.
