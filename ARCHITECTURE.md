@@ -26,3 +26,9 @@ Visual vocabulary does not belong here. Buttons, inputs, themes, icons, windows 
 ## Runtime invariant
 
 A product owns one `UiRuntime`, which owns one Engine renderer and Space. Every UI consumer attaches surfaces to that runtime instead of creating an independent renderer or scene graph per component. Static Storybook builds and MetaFor integration must preserve one Engine module identity and one UI runtime in the final ESM graph.
+
+The browser composition root declares one Engine-owned default font URL through
+`<meta name="engine-default-font" content="…">`. `UiRuntime` loads it only when
+the caller supplies neither a parsed font nor a custom font URL, and Engine
+caches one parsed instance per absolute URL. Visual packages never own or copy a
+font route. A custom font bypasses the document default without requesting it.

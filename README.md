@@ -21,6 +21,10 @@ Most interface frameworks stop at a flat browser viewport. Layout is built for s
 
 Layout is infrastructure, not a theme. Visual Elements and Components live in [zavx0z/ui](https://github.com/zavx0z/ui); high-performance node editors live in [zavx0z/node](https://github.com/zavx0z/node); GPU primitives come from [zavx0z/engine](https://github.com/zavx0z/engine).
 
+The default TTF remains owned by Engine. A ready application declares its
+served URL once in HTML; `UiRuntime` fetches it lazily and shares the parsed
+font. Passing another `font` or `fontUrl` skips the default request entirely.
+
 ## Storybook
 
 The static [Layout Storybook](https://zavx0z.github.io/layout/) demonstrates the same runtime as a flat HUD and as a spatial display. It is built on every green `main` and deployed to GitHub Pages.

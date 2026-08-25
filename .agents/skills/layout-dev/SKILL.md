@@ -24,6 +24,11 @@ One product runtime owns one retained Engine renderer and Space. Surfaces attach
 to that runtime instead of creating a renderer or scene per component. Flat HUD
 and optional spatial-display behavior must remain coherent.
 
+The HTML composition root declares one `engine-default-font` meta URL.
+`UiRuntime.create()` loads it lazily only without a custom `font` or `fontUrl`,
+and Engine shares the parsed instance. Layout source and visual packages do not
+own a copied default TTF or eagerly fetch it.
+
 ## Checks
 
 Run focused tests while iterating, then:

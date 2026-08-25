@@ -5,8 +5,9 @@ import {
   Mesh,
   Object3D,
   RoundedRectMaterial,
-  TrueTypeFont,
+  type TrueTypeFont,
 } from "@engine/core"
+import {loadSharedFont} from "@engine/core/default-font"
 import type {UiRuntime} from "./runtime.ts"
 import {UiSurface} from "./surface.ts"
 
@@ -85,8 +86,7 @@ const meshExtents = (mesh: Mesh): {xMin: number; xMax: number; yMin: number; yMa
 let font: TrueTypeFont
 
 beforeAll(async () => {
-  const bytes = await Bun.file(new URL("../../storybook/public/jetbrains-mono-bold.ttf", import.meta.url)).arrayBuffer()
-  font = new TrueTypeFont(bytes)
+  font = await loadSharedFont(import.meta.resolve("@engine/core/fonts/jetbrains-mono-bold.ttf"))
 })
 
 const setupSurface = (): {surface: ShadowTestSurface; fake: FakeRuntime} => {

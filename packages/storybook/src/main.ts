@@ -5,7 +5,6 @@ const canvas = document.querySelector("#stage")
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error("Missing Storybook canvas")
 
 const runtime = await UiRuntime.create(canvas, {
-  fontUrl: "./jetbrains-mono-bold.ttf",
   virtualDisplay: {initial: "near", surfaceDisplay: true, grid: true},
 })
 const story = new RuntimeStory({bgColor: null, borderColor: null})

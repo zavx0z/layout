@@ -1,8 +1,10 @@
 import {cp, mkdir, rm} from "node:fs/promises"
 import {join} from "node:path"
+import {fileURLToPath} from "node:url"
 
 const root = new URL("..", import.meta.url).pathname
 const output = join(root, "pages")
+const engineFont = fileURLToPath(import.meta.resolve("@engine/core/fonts/jetbrains-mono-bold.ttf"))
 await rm(output, {recursive: true, force: true})
 await mkdir(output, {recursive: true})
 
@@ -18,5 +20,5 @@ const build = await Bun.build({
 if (!build.success) throw new AggregateError(build.logs, "Layout Storybook build failed")
 
 await cp(join(root, "index.html"), join(output, "index.html"))
-await cp(join(root, "public/jetbrains-mono-bold.ttf"), join(output, "jetbrains-mono-bold.ttf"))
+await cp(engineFont, join(output, "jetbrains-mono-bold.ttf"))
 await Bun.write(join(output, ".nojekyll"), "")

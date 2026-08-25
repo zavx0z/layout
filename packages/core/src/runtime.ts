@@ -17,6 +17,7 @@ import {UIDisplay} from "./targets/display.ts"
 import {VirtualInput, type VirtualInputSoftKeyboardMode} from "./virtual-input.ts"
 import {surfacesShareActivePopoverChain, type PopoverChainSurface} from "./popover-owner.ts"
 import {blurActiveInput, handleActiveInputKey, insertActiveInputText, surfaceHasActiveInput} from "./text-input.ts"
+import {resolveUiRuntimeFont, type UiRuntimeFontOptions} from "./runtime-font.ts"
 
 export type UiSurfaceRect = {x: number; y: number; w: number; h: number; visible?: boolean}
 export type UiSurfaceLayoutFn = (canvas: {w: number; h: number}) => UiSurfaceRect
@@ -231,9 +232,7 @@ export type UiVirtualDisplayOpts = {
   displayDragLongPressMs?: number
 }
 
-export type UiRuntimeOpts = {
-  /** Путь к TTF-шрифту. По умолчанию '/jetbrains-mono-bold.ttf'. */
-  fontUrl?: string
+export type UiRuntimeOpts = UiRuntimeFontOptions & {
   /** Camera distance in engine world units. По контракту engine это mm. Default 600. */
   cameraDistanceMm?: number
   /** Field of view. Default π/4. */
@@ -256,17 +255,40 @@ export type UiRuntimeOpts = {
   onDisplayLongPress?: (event: UiRuntimeDisplayLongPress) => void
 }
 
-const DEFAULT_FONT_URL = "/jetbrains-mono-bold.ttf"
 const TOUCH_DISPLAY_LONG_PRESS_MS = 520
 const TOUCH_DISPLAY_LONG_PRESS_MOVE_PX = 12
 const DISPLAY_NEAR_FIT_PADDING = 1.002
 
 export class UiRuntime {
+  /**
+  Creates one retained UI runtime and resolves its font before GPU ownership
+  begins.
+
+  `opts.font` uses the supplied parsed font without a request. `opts.fontUrl`
+  uses Engine's shared URL cache. With neither option, the first runtime reads
+  `<meta name="engine-default-font" content="…">` from the document and lazily
+  loads that URL; later runtimes reuse the parsed instance.
+
+  @param canvas - Browser canvas that becomes the sole renderer target.
+  @param opts - Runtime configuration and exactly zero or one custom font
+  source.
+
+  @returns Initialized runtime with one retained renderer, Space, HUD, and font.
+
+  @throws If both custom font sources are supplied, the document default is
+  absent, or font/GPU initialization fails.
+
+  @example
+  ```ts
+  const runtime = await UiRuntime.create(canvas)
+  const custom = await UiRuntime.create(otherCanvas, {font: projectFont})
+  ```
+  */
   static async create(canvas: HTMLCanvasElement, opts: UiRuntimeOpts = {}): Promise<UiRuntime> {
+    const font = await resolveUiRuntimeFont(opts)
     const renderer = new Renderer()
     await renderer.init(canvas)
     renderer.setPixelRatio(window.devicePixelRatio || 1)
-    const font = await TrueTypeFont.fromUrl(opts.fontUrl ?? DEFAULT_FONT_URL)
     return new UiRuntime(canvas, renderer, font, opts)
   }
 
