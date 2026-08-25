@@ -16,22 +16,92 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/checkout@v6
+      - name: Check out Layout
+        uses: actions/checkout@v6
+
+      - name: Check out Engine dependency
+        uses: actions/checkout@v6
         with:
           repository: zavx0z/engine
-          ref: e02516423a529749119eaf5438f68a944491577e
+          ref: ae461b8ab622d391247c714f3937f18bd5b4ae45
           path: .deps/engine
-      - uses: oven-sh/setup-bun@v2
+
+      - name: Check out UI dependency
+        uses: actions/checkout@v6
+        with:
+          repository: zavx0z/ui
+          ref: 1ab29de686b1bb238d43e37a55d9ed428ccc799d
+          path: .deps/ui
+
+      - name: Check out Highlighter dependency
+        uses: actions/checkout@v6
+        with:
+          repository: zavx0z/highlighter
+          ref: a9f240b682a6ccec042ea04522220f153d3b53eb
+          path: .deps/highlighter
+
+      - name: Check out shared Storybook dependency
+        uses: actions/checkout@v6
+        with:
+          repository: zavx0z/storybook
+          ref: bbacaa721b9327dc771f348f017bd6e0a7cef3df
+          path: .deps/storybook
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
-      - name: Link Engine
-        run: cd .deps/engine/packages/core && bun link
-      - run: bun install --frozen-lockfile
-      - run: bun run check
-      - run: bun run pages
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+
+      - name: Register Engine package
+        working-directory: .deps/engine/packages/core
+        run: bun link
+
+      - name: Register Layout package
+        working-directory: packages/core
+        run: bun link
+
+      - name: Register UI Elements package
+        working-directory: .deps/ui/packages/elements
+        run: bun link
+
+      - name: Register UI Components package
+        working-directory: .deps/ui/packages/components
+        run: bun link
+
+      - name: Install and verify Highlighter dependency
+        working-directory: .deps/highlighter
+        run: bun install --frozen-lockfile && bun run check
+
+      - name: Register Highlighter package
+        working-directory: .deps/highlighter
+        run: bun link
+
+      - name: Install shared Storybook dependencies
+        working-directory: .deps/storybook
+        run: bun install --frozen-lockfile
+
+      - name: Register shared Storybook package
+        working-directory: .deps/storybook
+        run: bun link
+
+      - name: Install UI dependencies
+        working-directory: .deps/ui
+        run: bun install --frozen-lockfile
+
+      - name: Install Layout dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check Layout
+        run: bun run check
+
+      - name: Build static Layout Storybook
+        run: bun run pages
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Layout Storybook artifact
+        uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
@@ -42,6 +112,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Deploy
+      - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4
