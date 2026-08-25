@@ -1,4 +1,5 @@
 node_modules/
+dist/
 packages/storybook/pages/
 .DS_Store
 *.log

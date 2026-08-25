@@ -27,7 +27,18 @@ font. Passing another `font` or `fontUrl` skips the default request entirely.
 
 ## Storybook
 
-The static [Layout Storybook](https://zavx0z.github.io/layout/) demonstrates the same runtime as a flat HUD and as a spatial display. It is built on every green `main` and deployed to GitHub Pages.
+The [Layout Storybook](https://zavx0z.github.io/layout/) uses the shared
+five-region Workbench, but its preview remains owned by `@layout/core`. Two
+exact pathname stories prove different real targets:
+
+- `ui-runtime/target/hud` attaches the card through `addHudSurface()`;
+- `ui-runtime/target/spatial-display` attaches another card through
+  `addSurface()` to the built-in `UIDisplay`.
+
+The catalog runs without HMR at `http://127.0.0.1:4020/layout/`. Static Pages
+output uses the same `/layout/` base and a schema-1 manifest with exact
+revisions, routes, lazy chunks, sizes and SHA-256 hashes. Deployment is manual
+and owner-gated; it is not triggered by every green `main`.
 
 ## Workspace
 

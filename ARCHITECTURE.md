@@ -36,3 +36,23 @@ The browser composition root declares one Engine-owned default font URL through
 the caller supplies neither a parsed font nor a custom font URL, and Engine
 caches one parsed instance per absolute URL. Visual packages never own or copy a
 font route. A custom font bypasses the document default without requesting it.
+
+## Repository Storybook
+
+Development descriptors for `@layout/core` live in
+`packages/core/storybook/**`, outside production exports and typecheck inputs.
+The private `@layout/storybook` app composes them through exact
+`@zavx0z/storybook/*` subpaths. Layout/UI dependencies required by the shared
+Workbench remain private development dependencies; `@layout/core` still
+depends only on Engine.
+
+One canvas and one `UiRuntime` own the fixed Workbench HUD plus the selected
+preview. The HUD story has a real `HUD` parent. The spatial story has a real
+`UiRuntimeDisplay` parent and can move into Space without taking navigation,
+source or events away from the camera-locked Workbench.
+
+Local and static delivery share `/layout/`. The no-HMR server keeps port `4020`;
+the shared static builder writes repository-root `dist/`, fail-closed deep-link
+recovery and a schema-1 manifest. Pages remains manual and cannot be called a
+cold proof until Engine, UI, Highlighter and shared Storybook are delivered at
+immutable revisions and the workflow pins them.

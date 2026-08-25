@@ -94,3 +94,26 @@ broad-phase primitives; they are not the shaped parity API. Focused proof is in
 `src/surface-child-clip.test.ts` and covers immediate and retained metadata,
 rounded hit/wheel rejection, nested scopes, screen-minimum input, rollback,
 transform, visibility, disposal, portal inheritance, and the Surface root.
+
+## Development Storybook ownership
+
+### LAYOUT-STORYBOOK-001 — Package-owned lazy catalog
+
+Development stories for `@layout/core` live in `packages/core/storybook/**`.
+They are not production exports or production dependencies. The private
+repository Storybook composes the owner catalog without copying its title,
+description, source example, target, or Surface factory.
+
+Each exact detail route has one independent dynamic module. Unknown paths fail
+closed and must not select a representative story as a routing fallback.
+
+### LAYOUT-STORYBOOK-002 — Honest HUD and spatial targets
+
+The `ui-runtime/target/hud` story creates a fresh `RuntimeStory` that the
+repository app attaches through `UiRuntime.addHudSurface()`. The
+`ui-runtime/target/spatial-display` story creates a separate fresh
+`RuntimeStory` that the app attaches through `UiRuntime.addSurface()`.
+
+Changing the camera or display mode of a HUD-attached Surface must not stand in
+for a real spatial-display story. The selected owner target and the actual
+runtime attachment must agree.

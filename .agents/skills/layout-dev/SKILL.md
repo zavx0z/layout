@@ -45,6 +45,10 @@ the static `/layout/` artifact. Before accepting linked integration, verify that
 `@engine/core` resolves to the intended Engine checkout or immutable revision;
 a global Bun link is a temporary overlay, not release evidence.
 
+The static artifact is repository-root `dist/` and must contain `.nojekyll`,
+the Engine font, fail-closed known-route recovery and schema-1
+`storybook-manifest.json` identities, lazy chunks, sizes and SHA-256 hashes.
+
 GitHub Pages deployment is manual and owner-gated. Never dispatch
 `.github/workflows/pages.yml`, run `gh workflow run`, change repository Pages
 settings, or deploy an artifact unless the owner explicitly requests deployment
@@ -53,10 +57,18 @@ authorize publishing it.
 
 ## Storybook and evidence
 
-`bun run storybook` builds and serves the catalog at
-`http://127.0.0.1:4020`. Inspect listener ownership before starting it and never
-adopt or stop a foreign process. Restart the exact owned process after a stable
-source checkpoint when the build is stale.
+`bun run storybook` starts the shared no-HMR catalog at
+`http://127.0.0.1:4020/layout/`. It compiles the one page on first request and
+keeps it until an owner-controlled restart. Inspect listener ownership before
+starting it and never adopt or stop a foreign process. Restart only the exact
+owned process after a stable source checkpoint.
+
+Canonical overview routes end in `/`; leaves
+`/layout/ui-runtime/target/hud` and
+`/layout/ui-runtime/target/spatial-display` do not. Unknown suffixes return
+404. Browser evidence requires `layoutStorybook=ready`, console 0, a non-black
+`#layout-story-canvas`, and exact `layoutStorybookSurfaceParent`: HUD for the
+first story and `UiRuntimeDisplay` for the second.
 
 For visual or input changes, verify the exact flat-HUD and spatial-display
 stories affected, console output, and the rendered WebGPU result. A static build
