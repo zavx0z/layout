@@ -19,7 +19,20 @@ import {surfacesShareActivePopoverChain, type PopoverChainSurface} from "./popov
 import {blurActiveInput, handleActiveInputKey, insertActiveInputText, surfaceHasActiveInput} from "./text-input.ts"
 import {resolveUiRuntimeFont, type UiRuntimeFontOptions} from "./runtime-font.ts"
 
+/**
+ * Parent-authoritative logical rectangle for one Surface slot.
+ *
+ * @see [LAYOUT-SLOT-001](../requirements.md#semantic-child-slots)
+ */
 export type UiSurfaceRect = {x: number; y: number; w: number; h: number; visible?: boolean}
+
+/**
+ * Computes the authoritative rectangle for one Surface slot from its parent
+ * bounds. Two or more sibling Surface slots derive from one canonical Flex
+ * plan rather than independent manual offsets.
+ *
+ * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ */
 export type UiSurfaceLayoutFn = (canvas: {w: number; h: number}) => UiSurfaceRect
 export type UiSurfaceLayerOpts = {
   /** Local order inside a window. Without windowId this is the legacy global surface layer. */
@@ -66,6 +79,15 @@ export type UiRuntimeDisplaySnapshot = {
   outline: UiDisplayHoverOutline | null
 }
 
+/**
+ * Runtime-facing contract for one stable Surface-owned Engine node.
+ *
+ * `UiRuntime` attaches and repositions this exact node. Visibility or
+ * transform-only frame changes stay on the same retained chain; Surface-owned
+ * descendants and input use that chain rather than a parallel graph.
+ *
+ * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+ */
 export interface UiSurfaceNode {
   /** Object3D, который UiRuntime позиционирует. node.origin = TL surface-rect. */
   readonly node: Object3D
@@ -259,6 +281,17 @@ const TOUCH_DISPLAY_LONG_PRESS_MS = 520
 const TOUCH_DISPLAY_LONG_PRESS_MOVE_PX = 12
 const DISPLAY_NEAR_FIT_PADDING = 1.002
 
+/**
+ * Owns one retained Engine renderer and Space and attaches stable Surface
+ * nodes to display or HUD targets.
+ *
+ * Layout callbacks allocate parent-authoritative Surface rectangles. Runtime
+ * frame movement and visibility changes update the existing Surface node
+ * instead of replacing its retained identity.
+ *
+ * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+ */
 export class UiRuntime {
   /**
   Creates one retained UI runtime and resolves its font before GPU ownership
@@ -481,7 +514,13 @@ export class UiRuntime {
     this.#attachInputListeners()
   }
 
-  /** Регистрирует surface. layout-функция вызывается на каждом resize. */
+  /**
+   * Registers a Surface on the runtime's built-in display. The layout
+   * callback is evaluated from parent bounds on each applicable relayout.
+   *
+   * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+   * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+   */
   addSurface(surface: UiSurfaceNode, layout: UiSurfaceLayoutFn, opts: UiSurfaceLayerOpts = {}): void {
     if (this.#displaySpaceEnabled && this.display === null) {
       throw new Error("addSurface requires an explicit UIDisplay in display-space mode")
@@ -489,7 +528,12 @@ export class UiRuntime {
     this.addSurfaceToDisplay(this.#surfaceDisplayId, surface, layout, opts)
   }
 
-  /** Регистрирует surface на конкретном UIDisplay внутри общего Space. */
+  /**
+   * Registers a Surface on one `UIDisplay` while preserving its exact retained
+   * node as the display-owned child.
+   *
+   * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+   */
   addSurfaceToDisplay(displayId: UiDisplayId, surface: UiSurfaceNode, layout: UiSurfaceLayoutFn, opts: UiSurfaceLayerOpts = {}): void {
     const displaySlot = this.#displaySlots.get(displayId)
     if (this.#displaySpaceEnabled && displaySlot === undefined) {
@@ -521,7 +565,12 @@ export class UiRuntime {
     this.requestRender()
   }
 
-  /** Регистрирует HUD-surface поверх Space в camera/head-locked слое. */
+  /**
+   * Registers a Surface on the camera-locked HUD while preserving its exact
+   * retained node as the HUD-owned child.
+   *
+   * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+   */
   addHudSurface(surface: UiSurfaceNode, layout: UiSurfaceLayoutFn, opts: UiSurfaceLayerOpts = {}): void {
     surface.attachCanvas(this)
     surface.setFramebufferClipSpace?.("screen")

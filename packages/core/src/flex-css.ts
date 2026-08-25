@@ -32,6 +32,12 @@
 
 import type {FlexAlign, FlexJustify} from "./flex.types.ts"
 
+/**
+ * CSS-like size declaration used inside one canonical Flex plan. These forms
+ * are a sizing vocabulary, not a second layout or sibling-positioning system.
+ *
+ * @see [LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ */
 export type UiSize =
   | number
   | "grow"
@@ -62,6 +68,12 @@ type FlexCssBoxBase = {
   justifyContent?: FlexJustify
 }
 
+/**
+ * One semantic child slot in a CSS-sized horizontal Flex plan. `draw`
+ * receives the authoritative rectangle allocated by the parent plan.
+ *
+ * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ */
 export type FlexCssRowItem = {
   /** Main-axis size: px, "42%", "1fr", "grow", "auto" или объект. */
   width: UiSize
@@ -71,6 +83,12 @@ export type FlexCssRowItem = {
   draw(x: number, y: number, width: number, height: number): void
 }
 
+/**
+ * One semantic child slot in a CSS-sized vertical Flex plan. `draw` receives
+ * the authoritative rectangle allocated by the parent plan.
+ *
+ * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ */
 export type FlexCssColumnItem = {
   /** Main-axis size: px, "18.5%", "1fr", "grow", "auto" или объект. */
   height: UiSize
@@ -80,7 +98,9 @@ export type FlexCssColumnItem = {
   draw(x: number, y: number, width: number, height: number): void
 }
 
+/** One complete CSS-sized horizontal sibling-slot plan. */
 export type FlexCssRowOpts = FlexCssBoxBase & {items: Array<FlexCssRowItem | null | undefined | false>}
+/** One complete CSS-sized vertical sibling-slot plan. */
 export type FlexCssColumnOpts = FlexCssBoxBase & {items: Array<FlexCssColumnItem | null | undefined | false>}
 
 type Kind = {kind: "px"; value: number} | {kind: "percent"; value: number} | {kind: "fr"; value: number}
@@ -88,6 +108,8 @@ type Kind = {kind: "px"; value: number} | {kind: "percent"; value: number} | {ki
 /**
  * Нормализует UiSize в один из трёх классов. Для cross-axis "auto"/"grow"/"fr"
  * означают stretch к inner box; в main-axis они распределяют остаток.
+ *
+ * @see [LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
  */
 export function parseUiSize(size: UiSize): Kind {
   if (typeof size === "number") return {kind: "px", value: size}
@@ -139,6 +161,13 @@ function paddings(opts: FlexCssBoxBase): {padL: number; padR: number; padT: numb
   }
 }
 
+/**
+ * Allocates one CSS-sized row of sibling semantic child slots in a single
+ * deterministic pass and supplies each callback with its authoritative local
+ * rectangle.
+ *
+ * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ */
 export function flexRowCss(opts: FlexCssRowOpts): void {
   const {padL, padR, padT, padB, gap} = paddings(opts)
   const innerX = opts.x + padL
@@ -189,6 +218,13 @@ export function flexRowCss(opts: FlexCssRowOpts): void {
   }
 }
 
+/**
+ * Allocates one CSS-sized column of sibling semantic child slots in a single
+ * deterministic pass and supplies each callback with its authoritative local
+ * rectangle.
+ *
+ * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ */
 export function flexColumnCss(opts: FlexCssColumnOpts): void {
   const {padL, padR, padT, padB, gap} = paddings(opts)
   const innerX = opts.x + padL

@@ -39,6 +39,17 @@ import type {
   FlexRowOpts,
 } from "./flex.types.ts"
 
+/**
+ * Allocates one row of sibling semantic child slots in a single deterministic
+ * pass, then invokes each item's `draw` callback with its authoritative local
+ * rectangle.
+ *
+ * Parents with two or more sibling semantic slots use one `flexRow` (or one of
+ * the other canonical planners) instead of manual sibling offsets. Callbacks
+ * may calculate primitive geometry inside the rectangle they receive.
+ *
+ * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ */
 export function flexRow(opts: FlexRowOpts): void {
   const {padL, padR, padT, padB, gap} = paddings(opts)
   const innerX = opts.x + padL
@@ -81,6 +92,18 @@ export function flexRow(opts: FlexRowOpts): void {
   }
 }
 
+/**
+ * Allocates one column of sibling semantic child slots in a single
+ * deterministic pass, then invokes each item's `draw` callback with its
+ * authoritative local rectangle.
+ *
+ * Parents with two or more sibling semantic slots use one `flexColumn` (or one
+ * of the other canonical planners) instead of manual sibling offsets.
+ * Callbacks may calculate primitive geometry inside the rectangle they
+ * receive.
+ *
+ * @see [LAYOUT-SLOT-001 and LAYOUT-FLEX-001](../requirements.md#semantic-child-slots)
+ */
 export function flexColumn(opts: FlexColumnOpts): void {
   const {padL, padR, padT, padB, gap} = paddings(opts)
   const innerX = opts.x + padL

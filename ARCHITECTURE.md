@@ -23,6 +23,10 @@ The underlying `Space`, renderer, camera, geometry and GPU materials come from [
 
 Visual vocabulary does not belong here. Buttons, inputs, themes, icons, windows and product-specific composition are owned by [zavx0z/ui](https://github.com/zavx0z/ui).
 
+The canonical composition, retained-subtree, and clipping laws are defined by
+the stable IDs in the [`@layout/core` requirements](packages/core/requirements.md).
+Consumer repositories reference that owner contract instead of duplicating it.
+
 ## Runtime invariant
 
 A product owns one `UiRuntime`, which owns one Engine renderer and Space. Every UI consumer attaches surfaces to that runtime instead of creating an independent renderer or scene graph per component. Static Storybook builds and MetaFor integration must preserve one Engine module identity and one UI runtime in the final ESM graph.

@@ -170,12 +170,24 @@ export type HitState = {
 
 export type UiSurfacePadding = number | {top?: number; right?: number; bottom?: number; left?: number}
 
+/**
+ * Generic Surface chrome and content-inset options.
+ *
+ * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+ * @see [LAYOUT-CLIP-001](../requirements.md#clip-parity)
+ */
 export type UiSurfaceOpts = {
   bgColor?: Color | null
   /** null = без рамки. Default — серая 1px. */
   borderColor?: Color | null
   borderWidthPx?: number
-  /** Скругление внешнего bg/border chrome в logical px. Default 0. */
+  /**
+   * Visual rounding of the outer background and border chrome in logical px.
+   * Default 0.
+   *
+   * This does not currently establish a rounded descendant or input clip. The
+   * missing rounded parity is recorded explicitly under LAYOUT-CLIP-001.
+   */
   borderRadiusPx?: number
   /**
    * Внутренние отступы в logical px. drawText/drawRect/hit/flex работают в
@@ -417,6 +429,21 @@ export const Z: {
   TEXT: 0.08,
 }
 
+/**
+ * Surface-owned retained UI root with drawing, clipping, and input services in
+ * one local coordinate space.
+ *
+ * Independently dirty subtrees are created through `createRetainedParent` and
+ * atomically drawn through `materializeRetainedParent`. Transform, visibility,
+ * and rectangular viewport-clip updates operate on that same parent identity
+ * and do not rematerialize unchanged children.
+ *
+ * Rounded descendant/input clip parity is a normative requirement but is not
+ * implemented by the current rectangular clip APIs.
+ *
+ * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+ * @see [LAYOUT-CLIP-001](../requirements.md#clip-parity)
+ */
 export abstract class UiSurface implements UiSurfaceNode {
   readonly node = new Object3D()
   /** Готовый набор TextMaterial'ов с palette-цветами. Reuse, не GC-friendly create. */
@@ -908,7 +935,15 @@ export abstract class UiSurface implements UiSurfaceNode {
     return true
   }
 
-  /** Creates one Surface-owned engine parent, optionally nested under another. */
+  /**
+   * Creates one Surface-owned retained Engine parent, optionally nested under
+   * another parent owned by this Surface.
+   *
+   * The returned object is the stable transform, visibility, clip, and input
+   * owner for its independently dirty subtree.
+   *
+   * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+   */
   protected createRetainedParent(parent?: Object3D): Object3D {
     const requestedParent = parent ?? this.#retainedLayer
     const transaction = this.#retainedMaterialization
@@ -930,7 +965,12 @@ export abstract class UiSurface implements UiSurfaceNode {
     return retainedParent
   }
 
-  /** Atomically replaces one retained parent's local drawing subtree. */
+  /**
+   * Atomically replaces one retained parent's local visual and input subtree
+   * while keeping the parent itself stable.
+   *
+   * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+   */
   protected materializeRetainedParent(parent: Object3D, draw: () => void): void {
     this.#requireRetainedParent(parent)
     if (this.#retainedMaterialization !== null) {
@@ -1012,7 +1052,12 @@ export abstract class UiSurface implements UiSurfaceNode {
     this.#disposeSubtrees(previousChildren)
   }
 
-  /** Updates only one retained parent's local transform and presents the frame. */
+  /**
+   * Updates only one retained parent's local transform and presents the frame.
+   * The parent, unchanged children, and their geometry preserve identity.
+   *
+   * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+   */
   protected updateRetainedTransform(parent: Object3D, update: (parent: Object3D) => void): void {
     this.#requireRetainedParent(parent)
     update(parent)
@@ -1021,7 +1066,16 @@ export abstract class UiSurface implements UiSurfaceNode {
     this.canvas?.requestRender()
   }
 
-  /** Sets one fixed surface-local viewport clip without rematerializing its subtree. */
+  /**
+   * Sets one rectangular surface-local viewport clip without rematerializing
+   * its subtree or replacing retained identities.
+   *
+   * This API does not implement the rounded descendant/input parity still
+   * required by LAYOUT-CLIP-001.
+   *
+   * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+   * @see [LAYOUT-CLIP-001](../requirements.md#clip-parity)
+   */
   protected updateRetainedViewportClip(parent: Object3D, clip: UiSurfaceRect | null): void {
     this.#requireRetainedParent(parent)
     if (clip === null) {
@@ -1039,7 +1093,12 @@ export abstract class UiSurface implements UiSurfaceNode {
     this.canvas?.requestRender()
   }
 
-  /** Changes retained visibility and releases any interaction owned by a hidden subtree. */
+  /**
+   * Changes visibility on the existing retained parent and releases any
+   * interaction owned by a hidden subtree without rematerializing it.
+   *
+   * @see [LAYOUT-RETAINED-001](../requirements.md#retained-ui-subtrees)
+   */
   protected updateRetainedVisibility(parent: Object3D, visible: boolean): void {
     this.#requireRetainedParent(parent)
     if (parent.visible === visible) return
@@ -2111,6 +2170,11 @@ export abstract class UiSurface implements UiSurfaceNode {
    * Все последующие drawText будут клипаться по этому rect'у в шейдере.
    * Пара push/pop обязательна. drawRect клампится в JS, на него clip-stack
    * не влияет (см. drawRect).
+   *
+   * This is a rectangular primitive. It does not satisfy the rounded
+   * descendant/input parity recorded as unmet under LAYOUT-CLIP-001.
+   *
+   * @see [LAYOUT-CLIP-001](../requirements.md#clip-parity)
    */
   pushClip(x: number, y: number, w: number, h: number): void {
     const top = this.#clipStack[this.#clipStack.length - 1]!
