@@ -100,7 +100,7 @@ jobs:
 
       - name: Build static Layout Storybook
         working-directory: layout
-        run: bun run pages
+        run: bun run check
 
       - name: Verify clean manifest identities
         working-directory: layout

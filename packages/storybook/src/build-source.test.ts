@@ -69,7 +69,7 @@ describe("Layout Storybook static build source", () => {
     expect(source).not.toContain("Bun.build")
     expect(source).not.toContain("rm(outputRoot")
     expect(source).not.toContain("copyFile")
-    expect(manifest.scripts?.pages).toBe("bun scripts/build.ts")
+    expect(manifest.scripts?.build).toBe("bun scripts/build.ts")
     expect(await Bun.file(new URL("../scripts/build-pages.ts", import.meta.url)).exists()).toBeFalse()
   })
 

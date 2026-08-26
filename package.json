@@ -18,9 +18,7 @@
   "scripts": {
     "typecheck": "bun run --workspaces typecheck",
     "test": "bun test packages",
-    "check": "bun run typecheck && bun run test",
-    "storybook": "bun run --cwd packages/storybook dev",
-    "pages": "bun run --cwd packages/storybook pages"
+    "check": "bun run typecheck && bun run test && bun run --cwd packages/storybook build"
   },
   "devDependencies": {
     "@ui/components": "link:@ui/components",

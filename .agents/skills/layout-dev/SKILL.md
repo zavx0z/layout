@@ -40,28 +40,18 @@ bun run pages
 git diff --check
 ```
 
-`bun run check` covers typecheck and tests. `bun run pages` separately proves
-the static `/layout/` artifact. Before accepting linked integration, verify that
+`bun run check` covers typecheck, tests and the static `/layout/` artifact.
+Before accepting linked integration, verify that
 `@engine/core` resolves to the intended Engine checkout or immutable revision;
 a global Bun link is a temporary overlay, not release evidence.
 
-The static artifact is repository-root `dist/` and must contain `.nojekyll`,
-the Engine font, fail-closed known-route recovery and schema-1
-`storybook-manifest.json` identities, lazy chunks, sizes and SHA-256 hashes.
-
-GitHub Pages deployment is manual and owner-gated. Never dispatch
-`.github/workflows/pages.yml`, run `gh workflow run`, change repository Pages
-settings, or deploy an artifact unless the owner explicitly requests deployment
-in the current task. `bun run pages` and checks verify an artifact; they do not
-authorize publishing it.
-
 ## Storybook and evidence
 
-`bun run storybook` starts the shared no-HMR catalog at
-`http://127.0.0.1:4020/layout/`. It compiles the one page on first request and
-keeps it until an owner-controlled restart. Inspect listener ownership before
-starting it and never adopt or stop a foreign process. Restart only the exact
-owned process after a stable source checkpoint.
+Use the global `$storybook` with exact package `@layout/storybook` for
+lifecycle, automatic origin, static build and browser evidence. This skill does
+not own a Storybook process, port, registry, target, lifecycle script or shared
+delivery rule. Layout package requirements retain only target-parent, linked
+Engine identity and visual expectations.
 
 Canonical overview routes end in `/`; leaves
 `/layout/ui-runtime/target/hud` and
@@ -70,7 +60,7 @@ Canonical overview routes end in `/`; leaves
 `#layout-story-canvas`, and exact `layoutStorybookSurfaceParent`: HUD for the
 first story and `UiRuntimeDisplay` for the second.
 
-For visual or input changes, verify the exact flat-HUD and spatial-display
+For visual or input changes, use `$storybook` to verify the exact flat-HUD and spatial-display
 stories affected, console output, and the rendered WebGPU result. A static build
 or unit test alone does not prove browser behavior. Keep WebGPU Inspector
 external to repository source and public artifacts.

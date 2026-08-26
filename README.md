@@ -35,8 +35,10 @@ exact pathname stories prove different real targets:
 - `ui-runtime/target/spatial-display` attaches another card through
   `addSurface()` to the built-in `UIDisplay`.
 
-The catalog runs without HMR at `http://127.0.0.1:4020/layout/`. Static Pages
-output uses the same `/layout/` base and a schema-1 manifest with exact
+The catalog runs without HMR on an OS-allocated port and emits its exact runtime
+origin. Agents use the global `$storybook` with `@layout/storybook`; no
+consumer port registry exists. Static Pages output uses the same `/layout/`
+base and a schema-1 manifest with exact
 revisions, routes, lazy chunks, sizes and SHA-256 hashes. Deployment is manual
 and owner-gated; it is not triggered by every green `main`.
 
@@ -57,8 +59,10 @@ cd ../engine/packages/core && bun link
 cd ../../../layout
 bun install
 bun run check
-bun run storybook
 ```
+
+Use `$storybook ensure @layout/storybook` for the local catalog and
+`$storybook check @layout/storybook` for its package gates.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for ownership and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution workflow.
 

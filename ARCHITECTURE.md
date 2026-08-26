@@ -51,8 +51,8 @@ preview. The HUD story has a real `HUD` parent. The spatial story has a real
 `UiRuntimeDisplay` parent and can move into Space without taking navigation,
 source or events away from the camera-locked Workbench.
 
-Local and static delivery share `/layout/`. The no-HMR server keeps port `4020`;
-the shared static builder writes repository-root `dist/`, fail-closed deep-link
+Local and static delivery share `/layout/`. The package-named no-HMR server uses
+an OS-allocated port; the shared static builder writes repository-root `dist/`, fail-closed deep-link
 recovery and a schema-1 manifest. Pages remains manual and cannot be called a
 cold proof until Engine, UI, Highlighter and shared Storybook are delivered at
 immutable revisions and the workflow pins them.
