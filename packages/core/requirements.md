@@ -43,6 +43,14 @@ their generic deterministic API and implementation must be extended before a
 consumer uses that composition. Renderer, visual-component, node-authoring,
 and product vocabulary remain outside the planner.
 
+Consumer HTML/CSS authoring is parsed by `@zavx0z/template` and resolved by
+target-neutral `@zavx0z/renderer`. A WebXR backend compiles CSS FlexBox once per
+dirty template/style input into the typed numeric options consumed by these
+planners. `flexRow`, `flexColumn`, `flexRowCss` and `flexColumnCss` do not parse
+template strings, selectors or CSS objects during planning or drawing;
+convenient numeric planner props are the efficient compiled representation, not
+a parallel consumer DSL.
+
 ## Retained UI subtrees
 
 ### LAYOUT-RETAINED-001 — Surface-owned retained parent
@@ -106,6 +114,9 @@ description, source example, target, or Surface factory.
 
 Each exact detail route has one independent dynamic module. Unknown paths fail
 closed and must not select a representative story as a routing fallback.
+
+Source shown to a consumer is the HTML/CSS tagged-template input whose compiled
+plan drives the story, not the internal numeric Flex planner call.
 
 ### LAYOUT-STORYBOOK-002 — Honest HUD and spatial targets
 

@@ -16,6 +16,7 @@ import {
 import type {
   StorybookStoryArgs,
   StorybookStoryIndexItem,
+  StorybookStorySource,
 } from "@zavx0z/storybook/stories"
 import {
   StorybookDockSurface,
@@ -24,10 +25,13 @@ import {
   planStorybookShell,
   type StorybookNavigationItem,
   type StorybookResponsivePolicy,
-  type StorybookStoryPanelMode,
+  type StorybookStoryPanelCategory,
   type StorybookStoryPanelOptions,
 } from "@zavx0z/storybook/workbench"
-import {storybookPublicPath} from "@zavx0z/storybook/environment"
+import {
+  storybookPublicPath,
+  waitForStorybookFrameBoundary,
+} from "@zavx0z/storybook/environment"
 import {
   LAYOUT_STORYBOOK_CATALOG,
   layoutStorybookPresentationRoute,
@@ -68,7 +72,7 @@ async function startLayoutStorybook(): Promise<void> {
     let storyRoute = initial.route
     let storyIndex = initial.index
     let story = initial.story
-    let panelMode: StorybookStoryPanelMode = "controls"
+    let panelCategory: StorybookStoryPanelCategory = "source"
     let catalogQuery = ""
     let collapsedGroups = new Set<string>()
     let selectionRevision = 0
@@ -115,7 +119,7 @@ async function startLayoutStorybook(): Promise<void> {
     let storyPanel: StorybookStoryPanelSurface
 
     const panelOptions = (): StorybookStoryPanelOptions => ({
-      source: story.source,
+      source: layoutStorySource(story),
       args: EMPTY_ARGS,
       controls: [],
       events: [
@@ -127,19 +131,19 @@ async function startLayoutStorybook(): Promise<void> {
         {id: "parent", label: "Сохраняемый родитель", value: evidence.parent},
         {id: "frames", label: "Представленные кадры", value: String(evidence.frames)},
       ],
-      mode: panelMode,
-      onModeChange(mode) {
-        panelMode = mode
+      category: panelCategory,
+      onCategoryChange(category) {
+        panelCategory = category
         storyPanel.setOptions(panelOptions())
         publish()
       },
       onControlChange() {},
-      async onCopy(source) {
+      async onCopy(kind, source) {
         try {
           await navigator.clipboard.writeText(source)
-          document.documentElement.dataset.layoutStorybookCopy = "copied"
+          document.documentElement.dataset.layoutStorybookCopy = `${kind}:copied`
         } catch {
-          document.documentElement.dataset.layoutStorybookCopy = "error"
+          document.documentElement.dataset.layoutStorybookCopy = `${kind}:error`
         }
       },
     })
@@ -205,6 +209,10 @@ async function startLayoutStorybook(): Promise<void> {
       document.documentElement.dataset.layoutStorybookTarget = evidence.target
       document.documentElement.dataset.layoutStorybookSurfaceParent = evidence.parent
       document.documentElement.dataset.layoutStorybookFrames = String(evidence.frames)
+      const source = layoutStorySource(story)
+      document.documentElement.dataset.layoutStorybookHtml = source.html
+      document.documentElement.dataset.layoutStorybookCss = source.css
+      document.documentElement.dataset.layoutStorybookTypescript = source.typescript
     }
 
     function present(): void {
@@ -233,6 +241,8 @@ async function startLayoutStorybook(): Promise<void> {
         previewHeader.setStory(storyIndex, story)
         runtime.relayout()
         present()
+        await waitForStorybookFrameBoundary()
+        if (revision !== selectionRevision || router.current !== node) return
         document.documentElement.dataset.layoutStorybook = "ready"
       } catch (error) {
         if (revision === selectionRevision) throw error
@@ -256,6 +266,8 @@ async function startLayoutStorybook(): Promise<void> {
     }
     present()
     if (router.current !== initialNode || selectionRevision !== 0) return
+    await waitForStorybookFrameBoundary()
+    if (router.current !== initialNode || selectionRevision !== 0) return
     document.documentElement.dataset.layoutStorybook = "ready"
   } catch (error) {
     publishError(error)
@@ -271,6 +283,22 @@ async function loadStableLayoutStory(router: StorybookRouteTreeRouter<string>) {
     const story = await LAYOUT_STORYBOOK_CATALOG.load(route)
     if (router.current === node) return Object.freeze({node, route, index, story})
   }
+}
+
+function layoutStorySource(story: Readonly<{id: string; source: string}>): StorybookStorySource {
+  return Object.freeze({
+    html: `<canvas id="layout-story-canvas" class="layout-story" data-story="${story.id}" aria-label="Layout Storybook: Workbench, HUD и пространственный дисплей"></canvas>`,
+    css: `.layout-story {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  outline: none;
+  touch-action: none;
+}`,
+    typescript: story.source,
+  })
 }
 
 function requireLayoutCanvas(): HTMLCanvasElement {

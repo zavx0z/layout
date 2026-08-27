@@ -21,6 +21,15 @@ describe("Layout Storybook shared Workbench application", () => {
     expect(source).not.toContain("#hud")
     expect(source).not.toContain("#space")
     expect(source).not.toContain("innerHTML")
+    expect(source).toContain('let panelCategory: StorybookStoryPanelCategory = "source"')
+    expect(source).toContain("source: layoutStorySource(story)")
+    expect(source).toContain('html: `<canvas id="layout-story-canvas"')
+    expect(source).toContain("typescript: story.source")
+    expect(source).toContain("onCategoryChange(category)")
+    expect(source).toContain("onCopy(kind, source)")
+    expect(source).toContain("dataset.layoutStorybookHtml = source.html")
+    expect(source).toContain("dataset.layoutStorybookCss = source.css")
+    expect(source).toContain("dataset.layoutStorybookTypescript = source.typescript")
   })
 
   test("keeps Workbench fixed while proving two real preview parents", async () => {
@@ -51,6 +60,10 @@ describe("Layout Storybook shared Workbench application", () => {
     expect(source).toContain("if (router.current === node) return")
     expect(source).toContain("evidence = previewStage.show(story, (nextEvidence) =>")
     expect(source.indexOf("present()")).toBeLessThan(
+      source.lastIndexOf('dataset.layoutStorybook = "ready"'),
+    )
+    expect(source).toContain("await waitForStorybookFrameBoundary()")
+    expect(source.indexOf("await waitForStorybookFrameBoundary()")).toBeLessThan(
       source.lastIndexOf('dataset.layoutStorybook = "ready"'),
     )
   })
