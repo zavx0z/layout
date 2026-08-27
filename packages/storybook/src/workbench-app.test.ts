@@ -1,7 +1,7 @@
 import {describe, expect, test} from "bun:test"
 
 describe("Layout Storybook shared Workbench application", () => {
-  test("uses one UiRuntime and all five Workbench regions", async () => {
+  test("uses one UiRuntime, all Workbench regions and the shared status bar", async () => {
     const source = await Bun.file(new URL("./main.ts", import.meta.url)).text()
 
     expect(source.match(/UiRuntime\.create\(/g)).toHaveLength(1)
@@ -13,11 +13,13 @@ describe("Layout Storybook shared Workbench application", () => {
       "StorybookNavigationSurface",
       "LayoutPreviewHeaderSurface",
       "StorybookDockSurface",
+      "StorybookStatusBarSurface",
       "StorybookStoryPanelSurface",
     ]) expect(source).toContain(region)
-    for (const frame of [".catalog", ".section", ".preview", ".dock", ".info"]) {
+    for (const frame of [".catalog", ".section", ".preview", ".dock", ".info", ".status"]) {
       expect(source).toContain(`frames(w, h)${frame}`)
     }
+    expect(source).toContain("new StorybookStatusBarSurface()")
     expect(source).not.toContain("#hud")
     expect(source).not.toContain("#space")
     expect(source).not.toContain("innerHTML")
@@ -41,6 +43,7 @@ describe("Layout Storybook shared Workbench application", () => {
     expect(app).toContain("runtime.addHudSurface(previewHeader")
     expect(app).toContain("runtime.addHudSurface(dock")
     expect(app).toContain("runtime.addHudSurface(storyPanel")
+    expect(app).toContain("runtime.addHudSurface(statusBar, ({w, h}) => frames(w, h).status)")
     expect(app).toContain("Math.min(560, availableWidth - 36)")
     expect(app).toContain("Math.min(260, availableHeight - 36)")
     expect(stage).toContain('if (story.target === "hud") this.#runtime.addHudSurface(surface, this.#layout)')

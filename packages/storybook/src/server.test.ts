@@ -30,8 +30,10 @@ describe("Layout Storybook no-HMR server", () => {
         expect(html, pathname).toContain('<base href="/layout/">')
         expect(html, pathname).toContain('<meta name="engine-default-font" content="/layout/fonts/jetbrains-mono-bold.ttf">')
         expect(html, pathname).toContain('<canvas id="layout-story-canvas"></canvas>')
-        expect(html, pathname).toContain("Создано для&nbsp;<a")
-        expect(html, pathname).toContain("переиспользуемая WebGPU-инфраструктура Layout")
+        expect(html, pathname).toContain('<meta name="storybook-status-bar-lead" content="Создано для">')
+        expect(html, pathname).toContain('<meta name="storybook-status-bar-owner" content="MetaFor">')
+        expect(html, pathname).toContain('<meta name="storybook-status-bar-detail" content="переиспользуемая WebGPU-инфраструктура Layout">')
+        expect(html, pathname).not.toContain("data-storybook-footer")
         expect(html, pathname).not.toContain("Built for MetaFor")
       }
 

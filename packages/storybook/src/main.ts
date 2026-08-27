@@ -1,5 +1,5 @@
 /**
-Layout Storybook application composed inside the shared five-region Workbench.
+Layout Storybook application composed inside the shared Workbench with its status bar.
 
 One `UiRuntime`, Engine renderer, Space and canvas own both the fixed Workbench
 HUD and the selected package-owned preview. The HUD route attaches its surface
@@ -21,6 +21,7 @@ import type {
 import {
   StorybookDockSurface,
   StorybookNavigationSurface,
+  StorybookStatusBarSurface,
   StorybookStoryPanelSurface,
   planStorybookShell,
   type StorybookNavigationItem,
@@ -116,6 +117,7 @@ async function startLayoutStorybook(): Promise<void> {
     const dock = new StorybookDockSurface<string>(dockOptions())
     const previewHeader = new LayoutPreviewHeaderSurface(storyIndex, story)
     const previewStage = new LayoutPreviewStage(runtime, previewContentFrame)
+    const statusBar = new StorybookStatusBarSurface()
     let storyPanel: StorybookStoryPanelSurface
 
     const panelOptions = (): StorybookStoryPanelOptions => ({
@@ -154,6 +156,7 @@ async function startLayoutStorybook(): Promise<void> {
     runtime.addHudSurface(previewHeader, previewHeaderFrame)
     runtime.addHudSurface(dock, ({w, h}) => frames(w, h).dock)
     runtime.addHudSurface(storyPanel, ({w, h}) => frames(w, h).info)
+    runtime.addHudSurface(statusBar, ({w, h}) => frames(w, h).status)
 
     function catalogOptions() {
       return {
@@ -197,7 +200,7 @@ async function startLayoutStorybook(): Promise<void> {
     }
 
     function flushWorkbench(): void {
-      for (const surface of [catalog, sections, dock, previewHeader, storyPanel]) surface.flushPendingRender()
+      for (const surface of [catalog, sections, dock, previewHeader, storyPanel, statusBar]) surface.flushPendingRender()
     }
 
     function publish(): void {
